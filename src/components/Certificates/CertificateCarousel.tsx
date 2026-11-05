@@ -1,536 +1,596 @@
 "use client";
 
 /**
- * CertificateCarousel — macOS-Inspired Folder Deck Window
- * Unified with the Hero, About, and Projects sections:
- * - Frosted-glass macOS window chrome (traffic lights, toolbar, segmented controls)
- * - Subtle desktop dotted pattern and ambient color blur blobs
- * - 5 vertical folder panels sitting side by side
- * - Staggered index tabs along each folder with vertical white pill labels
- * - Luxurious shades of pink, rose gold, blush, and satin cream
- * - Smooth hover (holding hover for 240ms or clicking expands the folder smoothly)
- * - Expanded view reveals the full certificate document + concise key details
- * - Zero emojis — uses Lucide icons only.
+ * CertificateCarousel — a compiled stack of paper folders (no window chrome).
+ * Desktop: folders sit side by side, hovering one fans it open (flex-grow) and
+ *          slides the certificate up out of the folder.
+ * Mobile:  the same folders stack vertically; tap one to open it.
+ * Plays a 1-second paper sound whenever a folder opens.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import {
-  ExternalLink,
-  Download,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Building2,
-  FileText,
-} from "lucide-react";
-import { playUiClick, playBookSlide } from "@/utils/sound";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ExternalLink, Download, X, ChevronDown } from "lucide-react";
+import { playUiClick } from "@/utils/sound";
 
-interface CertificateItem {
+/* ------------------------------------------------------------------ */
+/*  Data (paths are relative to /public)                               */
+/* ------------------------------------------------------------------ */
+const IMG = "/assets/images/certificates/image_ver/";
+const PDF = "/assets/images/certificates/";
+const PAPER_SOUND = "/assets/sounds/folder-certificates.mp3";
+
+interface Cert {
   id: string;
-  tabLabel: string;
-  tabPositionPercent: number; // Staggered vertical position along the folder edge
-  folderNumber: string;
+  tab: string; // short label on the folder sticker
   title: string;
   issuer: string;
   date: string;
-  pdfPath: string;
-  summary: string;
+  img: string;
+  pdf: string;
   skills: string[];
-  theme: {
-    bgGradient: string;
-    border: string;
-    pillText: string;
-    accentColor: string;
-    coverBg: string;
-  };
+  stickerAt: number; // vertical position of the sticker on the closed folder (%)
 }
 
-const CERTIFICATES: CertificateItem[] = [
+const CERTS: Cert[] = [
   {
-    id: "cert-data-analytics",
-    tabLabel: "data analytics",
-    tabPositionPercent: 10,
-    folderNumber: "01",
+    id: "data-analytics",
+    tab: "data analytics",
     title: "IT Specialist – Data Analytics",
     issuer: "Certiport (Pearson VUE)",
     date: "May 2026",
-    pdfPath: "/assets/images/certificates/Data Analytics (1).pdf",
-    summary: "Exploratory data analysis, statistical modeling, data cleaning, and Python analytics pipelines.",
-    skills: ["Data Modeling", "Python Analytics", "Statistical Analysis", "Data Visualization"],
-    theme: {
-      bgGradient: "linear-gradient(145deg, #fff1f5 0%, #fdf2f8 45%, #fce7f3 100%)",
-      border: "rgba(244, 114, 182, 0.4)",
-      pillText: "#9d174d",
-      accentColor: "#be185d",
-      coverBg: "#fce7f3",
-    },
+    img: IMG + "Data_Analytics.png",
+    pdf: PDF + "Data Analytics (1).pdf",
+    skills: ["Data Modeling", "Python Analytics", "Data Visualization"],
+    stickerAt: 12,
   },
   {
-    id: "cert-sp",
-    tabLabel: "social innovation",
-    tabPositionPercent: 28,
-    folderNumber: "02",
+    id: "lex",
+    tab: "social innovation",
     title: "Learning Express Programme",
     issuer: "Singapore Polytechnic",
     date: "Apr 2026",
-    pdfPath: "/assets/images/certificates/Mica_Danah_P__Paris_6a1badc628eafe0554ca4a57.pdf",
-    summary: "International design thinking, user empathy, rapid field prototyping, and cross-cultural social innovation.",
-    skills: ["Design Thinking", "Social Innovation", "Cross-Cultural Co-Creation", "User Empathy"],
-    theme: {
-      bgGradient: "linear-gradient(145deg, #fff0f3 0%, #fdf4f5 45%, #ffe4e6 100%)",
-      border: "rgba(251, 113, 133, 0.4)",
-      pillText: "#9f1239",
-      accentColor: "#e11d48",
-      coverBg: "#ffe4e6",
-    },
+    img: IMG + "LEX.jpg",
+    pdf: PDF + "LEX.pdf",
+    skills: ["Design Thinking", "Social Innovation", "User Empathy"],
+    stickerAt: 34,
   },
   {
-    id: "cert-device-mgmt",
-    tabLabel: "device management",
-    tabPositionPercent: 46,
-    folderNumber: "03",
+    id: "sikaptala",
+    tab: "research",
+    title: "SiKAPTala 2026 – National Research Presentation",
+    issuer: "De La Salle University–Dasmariñas",
+    date: "2026",
+    img: IMG + "SikapTala.png",
+    pdf: PDF + "Mica_Danah_P__Paris_6a1badc628eafe0554ca4a57.pdf",
+    skills: ["Research", "Presentation"],
+    stickerAt: 54,
+  },
+  {
+    id: "device-management",
+    tab: "device management",
     title: "Device Configuration & Management",
     issuer: "Certiport (Pearson VUE)",
     date: "Dec 2025",
-    pdfPath: "/assets/images/certificates/Device Configuration and Management.pdf",
-    summary: "Operating system deployment, cloud governance, device lifecycle management, and endpoint security.",
-    skills: ["OS Provisioning", "Cloud Architecture", "Device Governance", "Network Security"],
-    theme: {
-      bgGradient: "linear-gradient(145deg, #fff7ed 0%, #fdf2f8 45%, #ffedd5 100%)",
-      border: "rgba(251, 146, 60, 0.4)",
-      pillText: "#9a3412",
-      accentColor: "#ea580c",
-      coverBg: "#fed7aa",
-    },
+    img: IMG + "Device_Configuration_Management.png",
+    pdf: PDF + "Device Configuration and Management.pdf",
+    skills: ["OS Provisioning", "Device Governance", "Network Security"],
+    stickerAt: 20,
   },
   {
-    id: "cert-databases",
-    tabLabel: "relational databases",
-    tabPositionPercent: 64,
-    folderNumber: "04",
+    id: "databases",
+    tab: "relational databases",
     title: "IT Specialist – Databases",
     issuer: "Certiport (Pearson VUE)",
     date: "May 2025",
-    pdfPath: "/assets/images/certificates/Databases.pdf",
-    summary: "Relational database schema architecture, SQL queries, normalization, transaction integrity, and DBMS indexing.",
-    skills: ["Schema Architecture", "SQL Query Optimization", "Normalization", "MySQL & DBMS"],
-    theme: {
-      bgGradient: "linear-gradient(145deg, #faf5ff 0%, #fdf2f8 45%, #f5d0fe 100%)",
-      border: "rgba(192, 132, 252, 0.4)",
-      pillText: "#7e22ce",
-      accentColor: "#9333ea",
-      coverBg: "#f3e8ff",
-    },
+    img: IMG + "Databases.png",
+    pdf: PDF + "Databases.pdf",
+    skills: ["SQL Queries", "Normalization", "MySQL & DBMS"],
+    stickerAt: 42,
   },
   {
-    id: "cert-excel",
-    tabLabel: "advanced excel",
-    tabPositionPercent: 82,
-    folderNumber: "05",
+    id: "excel",
+    tab: "advanced excel",
     title: "Microsoft Office Specialist – Excel",
     issuer: "Certiport (Microsoft Certified)",
     date: "Dec 2023",
-    pdfPath: "/assets/images/certificates/Office Excel 2016.pdf",
-    summary: "Advanced dynamic formulas, multi-dimensional PivotTables, statistical reporting, and workflow automation.",
-    skills: ["Advanced Formulas", "Pivot Tables & Charts", "Data Validation", "Financial Modeling"],
-    theme: {
-      bgGradient: "linear-gradient(145deg, #f0fdf4 0%, #fdf2f8 45%, #dcfce7 100%)",
-      border: "rgba(74, 222, 128, 0.4)",
-      pillText: "#166534",
-      accentColor: "#15803d",
-      coverBg: "#dcfce7",
-    },
+    img: IMG + "Microsoft_Excel.png",
+    pdf: PDF + "Office Excel 2016.pdf",
+    skills: ["Advanced Formulas", "Pivot Tables", "Data Validation"],
+    stickerAt: 62,
   },
 ];
 
-const TrafficLights: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <div className={`flex items-center gap-2 ${className}`} aria-hidden>
-    <span className="h-3 w-3 rounded-full bg-[#ff5f57] ring-1 ring-black/10" />
-    <span className="h-3 w-3 rounded-full bg-[#febc2e] ring-1 ring-black/10" />
-    <span className="h-3 w-3 rounded-full bg-[#28c840] ring-1 ring-black/10" />
+/* muted pink / kraft brown / cream palette */
+const THEMES = [
+  { back: "#e6c6ca", front: "#f7e8e9", ink: "#5c3139" }, // blush
+  { back: "#d1b79c", front: "#eadbc8", ink: "#5a4330" }, // kraft
+  { back: "#e9dccb", front: "#f8f1e7", ink: "#5a4638" }, // cream
+  { back: "#d5a5ad", front: "#efd5d8", ink: "#5e2f3a" }, // dusty rose
+  { back: "#dbc4aa", front: "#efe3d3", ink: "#5a4330" }, // light kraft
+  { back: "#efd2d4", front: "#fbeeee", ink: "#5c3139" }, // pale blush
+];
+
+const num = (i: number) => String(i + 1).padStart(2, "0");
+const href = (p: string) => encodeURI(p);
+const vars = (i: number, extra: Record<string, string | number> = {}) =>
+  ({
+    "--back": THEMES[i % THEMES.length].back,
+    "--front": THEMES[i % THEMES.length].front,
+    "--ink": THEMES[i % THEMES.length].ink,
+    "--i": i,
+    ...extra,
+  }) as React.CSSProperties;
+
+/* ------------------------------------------------------------------ */
+/*  Small pieces                                                       */
+/* ------------------------------------------------------------------ */
+const Paperclip: React.FC<{ className?: string }> = ({ className = "" }) => (
+  <svg viewBox="0 0 28 72" className={className} aria-hidden fill="none" strokeLinecap="round">
+    <path d="M8 46V14a8 8 0 0 1 16 0V54a12 12 0 0 1-24 0V22" stroke="#a07b8e" strokeWidth="3.2" />
+    <path d="M8 46V14a8 8 0 0 1 16 0V54a12 12 0 0 1-24 0V22" stroke="#e6cbd8" strokeWidth="1" />
+  </svg>
+);
+
+const Details: React.FC<{ cert: Cert; compact?: boolean }> = ({ cert, compact }) => (
+  <div className="flex h-full flex-col justify-between gap-3" style={{ color: "var(--ink)" }}>
+    <div>
+      <h3 className={`font-bold leading-snug tracking-tight ${compact ? "text-lg" : "text-xl"}`}>
+        {cert.title}
+      </h3>
+      <p className="mt-0.5 text-[13px] opacity-70">
+        {cert.issuer} · {cert.date}
+      </p>
+    </div>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap gap-1.5">
+        {cert.skills.map((s) => (
+          <span key={s} className="cf-pill cf-chip">
+            <span>{s}</span>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <a
+          href={href(cert.pdf)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => playUiClick(true)}
+          className="cf-pill cf-pill-pink"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>View PDF</span>
+        </a>
+        <a
+          href={href(cert.pdf)}
+          download
+          onClick={() => playUiClick(true)}
+          className="cf-pill"
+        >
+          <Download className="h-3.5 w-3.5" />
+          <span>Download</span>
+        </a>
+      </div>
+    </div>
   </div>
 );
 
+/* ------------------------------------------------------------------ */
+/*  Section                                                            */
+/* ------------------------------------------------------------------ */
 export const CertificateCarousel: React.FC = () => {
   const [openIdx, setOpenIdx] = useState<number>(0);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const hoverTimer = useRef<number | undefined>(undefined);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundTimers = useRef<number[]>([]);
 
-  const activeCert = CERTIFICATES[openIdx] ?? CERTIFICATES[0];
-
-  const handleOpen = useCallback((idx: number) => {
-    if (idx < 0 || idx >= CERTIFICATES.length) return;
-    playBookSlide(true);
-    setOpenIdx(idx);
-  }, []);
-
-  const handleMouseEnter = (idx: number) => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => {
-      handleOpen(idx);
-    }, 240);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimer.current) {
-      clearTimeout(hoverTimer.current);
-      hoverTimer.current = null;
-    }
-  };
-
-  // Keyboard navigation (Left / Right arrow keys)
+  /* preload the paper sound once */
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") handleOpen(openIdx - 1);
-      if (e.key === "ArrowRight") handleOpen(openIdx + 1);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openIdx, handleOpen]);
-
-  useEffect(() => {
+    const a = new Audio(PAPER_SOUND);
+    a.preload = "auto";
+    audioRef.current = a;
     return () => {
-      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+      soundTimers.current.forEach((t) => window.clearTimeout(t));
     };
   }, []);
 
-  const headline = ["Verified", "credentials."];
+  /* only the first second of the sound, with a short fade-out */
+  const playPaper = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    soundTimers.current.forEach((t) => window.clearTimeout(t));
+    soundTimers.current = [];
+    try {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = 0.6;
+      a.play().catch(() => { }); // browsers may block it until the first click/tap
+      soundTimers.current.push(
+        window.setTimeout(() => (a.volume = 0.3), 800),
+        window.setTimeout(() => (a.volume = 0.1), 920),
+        window.setTimeout(() => a.pause(), 1000)
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const openFolder = useCallback(
+    (i: number) => {
+      if (i === openIdx) return;
+      playPaper();
+      setOpenIdx(i);
+    },
+    [openIdx, playPaper]
+  );
+
+  const hoverOpen = (i: number) => {
+    window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = window.setTimeout(() => openFolder(i), 200);
+  };
+  const cancelHover = () => window.clearTimeout(hoverTimer.current);
+
+  /* close lightbox with Escape */
+  useEffect(() => {
+    if (zoom === null) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setZoom(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom]);
+
+  /* scroll reveal + background parallax */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    const reveals = section.querySelectorAll<HTMLElement>("[data-reveal],[data-words]");
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      reveals.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-in");
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
+    );
+    reveals.forEach((el) => io.observe(el));
+
+    const blobs = Array.from(section.querySelectorAll<HTMLElement>("[data-speed]"));
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      for (const el of blobs) {
+        const host = el.parentElement;
+        if (!host) continue;
+        const r = host.getBoundingClientRect();
+        if (r.bottom < -300 || r.top > vh + 300) continue;
+        const d = r.top + r.height / 2 - vh / 2;
+        el.style.transform = `translate3d(0, ${(-d * parseFloat(el.dataset.speed || "0")).toFixed(1)}px, 0)`;
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
 
   return (
     <section
       id="certificates"
-      className="relative scroll-mt-12 overflow-hidden bg-[#f8f8fa] pt-16 pb-6 sm:pt-20 sm:pb-8"
+      ref={sectionRef}
+      className="relative scroll-mt-12 overflow-hidden bg-[#f8f8fa]"
     >
       <style>{`
-        /* frosted-glass macOS Window styling matching Projects */
-        .cert-win {
-          background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.5));
-          -webkit-backdrop-filter: blur(30px) saturate(1.5);
-          backdrop-filter: blur(30px) saturate(1.5);
-          border: 1px solid rgba(255,255,255,.88);
-          box-shadow: 0 0 0 1px rgba(15,23,42,.06), inset 0 1px 0 rgba(255,255,255,.95), 0 32px 64px -24px rgba(76,57,120,.3);
+        @keyframes cf-rise { from { opacity: 0; transform: translate3d(0, 60px, 0) rotate(var(--tilt, 0deg)); } to { opacity: 1; transform: none; } }
+        @keyframes cf-clip { 0% { opacity: 0; transform: translateY(-26px) rotate(-8deg); } 65% { opacity: 1; transform: translateY(3px) rotate(2deg); } 100% { opacity: 1; transform: none; } }
+        @keyframes cf-word { from { transform: translateY(110%); } to { transform: translateY(0); } }
+
+        [data-reveal] { opacity: 0; }
+        [data-reveal].is-in { opacity: 1; animation: cf-rise .9s cubic-bezier(.2,.8,.2,1) backwards; }
+        .cf-stack > * { opacity: 0; }
+        .is-in .cf-stack > * { opacity: 1; animation: cf-rise .9s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--i) * 90ms); }
+
+        .cf-mask { display: inline-block; overflow: hidden; padding: 0 .06em .14em; margin: 0 -.06em -.14em; vertical-align: bottom; }
+        .cf-word { display: inline-block; transform: translateY(110%); background: linear-gradient(135deg, #0b0b10 10%, #4a1236 50%, #f0568f 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .cf-words.is-in .cf-word { transform: none; animation: cf-word .95s cubic-bezier(.2,.8,.2,1) backwards; }
+
+        /* ---------- folder parts ---------- */
+        .cf-folder { flex-grow: var(--g, 1); flex-basis: 0; min-width: 0; transition: flex-grow .75s cubic-bezier(.3,.9,.3,1); }
+        .cf-panel {
+          background: var(--back);
+          box-shadow: -14px 0 24px -14px rgba(74,51,40,.38), 0 22px 36px -22px rgba(74,51,40,.4), inset 0 1px 0 rgba(255,255,255,.55);
         }
-        .cert-nav {
-          background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.55));
-          border: 1px solid rgba(255,255,255,.9);
-          box-shadow: 0 0 0 1px rgba(15,23,42,.06), 0 6px 14px -8px rgba(15,23,42,.3);
-        }
-        .cert-pill {
-          position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .45rem;
-          border-radius: 9999px; border: 1px solid rgba(148,163,184,.55); padding: .5rem 1rem;
-          font-size: 13.5px; font-weight: 500; color: #334155; white-space: nowrap;
-          background: linear-gradient(180deg, #fff, #f1f2f5);
-          box-shadow: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(15,23,42,.07), 0 4px 10px -6px rgba(15,23,42,.3);
-          transition: transform .15s, filter .15s;
-        }
-        .cert-chip { padding: .28rem .7rem; font-size: 12px; }
-        .cert-grad {
-          background: linear-gradient(135deg, #0b0b10 10%, #4a1236 50%, #f0568f 100%);
-          -webkit-background-clip: text; background-clip: text; color: transparent;
+        .cf-panel::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; background: repeating-linear-gradient(180deg, rgba(255,255,255,.16) 0 1px, transparent 1px 3px); }
+        .cf-peek { position: absolute; top: -9px; left: 38%; right: 6%; height: 26px; border-radius: 6px 6px 0 0; background: #fbf6ee; box-shadow: 0 -1px 4px rgba(74,51,40,.18); }
+        .cf-tab { position: absolute; top: -28px; left: 18px; height: 30px; display: flex; align-items: center; padding: 0 14px; border-radius: 12px 12px 0 0; background: var(--back); color: var(--ink); font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; box-shadow: inset 0 1px 0 rgba(255,255,255,.55); white-space: nowrap; }
+        .cf-tab::before, .cf-tab::after { content: ""; position: absolute; bottom: 0; width: 10px; height: 10px; }
+        .cf-tab::before { left: -10px; background: radial-gradient(circle at 0 0, transparent 10px, var(--back) 10.5px); }
+        .cf-tab::after { right: -10px; background: radial-gradient(circle at 100% 0, transparent 10px, var(--back) 10.5px); }
+        .cf-tab-label { max-width: 0; opacity: 0; margin-left: 0; overflow: hidden; transition: max-width .6s, opacity .4s, margin .4s; }
+        .is-open .cf-tab-label { max-width: 220px; opacity: 1; margin-left: 8px; }
+
+        .cf-sticker { background: rgba(255,255,255,.94); box-shadow: 0 6px 12px -6px rgba(74,51,40,.4), inset 0 0 0 1px rgba(74,51,40,.06); color: var(--ink); }
+        .cf-closed { transition: opacity .3s; }
+        .is-open .cf-closed { opacity: 0; pointer-events: none; }
+
+        .cf-open { opacity: 0; pointer-events: none; transition: opacity .35s; }
+        .is-open .cf-open { opacity: 1; pointer-events: auto; transition-delay: .3s; }
+        .cf-paper { transform: translateY(46px) rotate(-1.6deg); transition: transform .7s cubic-bezier(.2,.9,.3,1) .25s; background: #fff; box-shadow: 0 14px 26px -14px rgba(74,51,40,.5), 0 0 0 1px rgba(74,51,40,.06); }
+        .is-open .cf-paper { transform: translateY(0) rotate(-.6deg); }
+        .cf-pocket { transform: translateY(24px); transition: transform .6s cubic-bezier(.2,.9,.3,1) .3s; background: linear-gradient(180deg, color-mix(in srgb, var(--front) 88%, white), var(--front)); box-shadow: 0 -10px 20px -12px rgba(74,51,40,.35), inset 0 1px 0 rgba(255,255,255,.8); }
+        .is-open .cf-pocket { transform: none; }
+        .is-open .cf-clipper { animation: cf-clip .7s cubic-bezier(.3,1.3,.5,1) backwards .6s; }
+
+        /* mobile accordion */
+        .cf-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .55s cubic-bezier(.3,.9,.3,1); }
+        .is-open .cf-reveal { grid-template-rows: 1fr; }
+
+        /* macOS-style pills (same as the rest of the site) */
+        .cf-pill { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .4rem; border-radius: 9999px; border: 1px solid rgba(148,163,184,.55); padding: .45rem .9rem; font-size: 13px; font-weight: 500; color: #334155; white-space: nowrap; background: linear-gradient(180deg, #fff, #f1f2f5); box-shadow: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(15,23,42,.07), 0 4px 10px -6px rgba(15,23,42,.3); transition: transform .15s, filter .15s; }
+        .cf-pill > * { position: relative; z-index: 1; }
+        .cf-chip { padding: .25rem .65rem; font-size: 11.5px; }
+        .cf-pill-pink { color: #4a1230; border-color: rgba(224,98,143,.7); text-shadow: 0 1px 0 rgba(255,255,255,.55); background: linear-gradient(180deg, #ffc9db 0%, #ff9bbd 48%, #fb7fa9 52%, #ffa8c6 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 8px 16px -6px rgba(244,114,182,.6); }
+        .cf-pill-pink::before { content: ""; position: absolute; z-index: 0; left: 12px; right: 12px; top: 3px; height: 44%; border-radius: 9999px; background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.05)); }
+        a.cf-pill:active, button.cf-pill:active { transform: translateY(1px); filter: brightness(.96); }
+
+        @media (prefers-reduced-motion: reduce) {
+          [data-reveal].is-in, .is-in .cf-stack > *, .cf-words.is-in .cf-word, .is-open .cf-clipper { animation: none; }
+          .cf-stack > * { opacity: 1; } .cf-word { transform: none; }
+          .cf-folder, .cf-paper, .cf-pocket, .cf-reveal { transition-duration: .01s; }
         }
       `}</style>
 
-      {/* Ambient glassmorphic color blobs (dot pattern removed) */}
+      {/* dotted desktop pattern (same as the other sections) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: "radial-gradient(rgba(15,23,42,0.15) 1.3px, transparent 1.5px)",
+          backgroundSize: "34px 34px",
+        }}
+      />
+      {/* very soft warm blobs (parallax) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
-        <div className="absolute left-[-5%] top-[15%] h-[380px] w-[380px] rounded-full bg-[#ffc9dc] opacity-40 blur-3xl" />
-        <div className="absolute right-[-6%] top-[40%] h-[420px] w-[420px] rounded-full bg-[#d9ccff] opacity-40 blur-3xl" />
-        <div className="absolute left-[12%] bottom-[10%] h-[360px] w-[360px] rounded-full bg-[#ffe3cc] opacity-35 blur-3xl" />
+        {[
+          { cls: "left-[-6%] top-[10%] h-[420px] w-[420px] bg-[#f3d3d6]", speed: 0.1 },
+          { cls: "right-[-6%] top-[55%] h-[440px] w-[440px] bg-[#ead8c4]", speed: -0.08 },
+        ].map((b, i) => (
+          <div key={i} className="absolute inset-0">
+            <div
+              data-speed={b.speed}
+              className={`absolute rounded-full opacity-50 blur-3xl will-change-transform ${b.cls}`}
+            />
+          </div>
+        ))}
       </div>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6">
-        
-        {/* Section Header */}
-        <div className="mb-10 space-y-3">
-          <span className="cert-pill cert-chip">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-28 pt-24 sm:pt-32">
+        {/* header */}
+        <div className="mb-14 space-y-4">
+          <span
+            data-reveal
+            className="cf-pill cf-chip"
+          >
             <span className="h-2 w-2 rounded-full bg-pink-400" />
-            <span>Official Credentials</span>
+            <span>{CERTS.length} certificates</span>
           </span>
-          <h2 className="text-4xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight text-slate-900">
-            {headline.map((w, i) => (
-              <span key={w} className={i === headline.length - 1 ? "cert-grad" : ""}>
-                {w}{" "}
-              </span>
-            ))}
+          <h2
+            data-words
+            className="cf-words text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-7xl"
+          >
+            <span className="cf-mask">
+              <span className="cf-word">Certificates</span>
+            </span>
           </h2>
-          <p className="max-w-md text-base sm:text-lg text-slate-500">
-            Hover over any folder tab or click to preview the verified certificate dossier.
+          <p data-reveal className="max-w-md text-lg text-slate-500">
+            <span className="hidden lg:inline">Hover</span>
+            <span className="lg:hidden">Tap</span> a folder to open it.
           </p>
         </div>
 
-        {/* ── macOS-Inspired Frosted Glass Window ── */}
-        <div className="cert-win relative rounded-[28px] sm:rounded-[32px] overflow-hidden p-4 sm:p-6 shadow-2xl">
-          
-          {/* macOS Window Top Toolbar */}
-          <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-200/60">
-            <TrafficLights />
-
-            {/* Back / Next Segmented Control */}
-            <div className="cert-nav flex items-center rounded-full ml-1">
-              <button
-                type="button"
-                aria-label="Previous folder"
-                disabled={openIdx === 0}
-                onClick={() => handleOpen(openIdx - 1)}
-                className="px-3 py-1.5 text-slate-700 transition disabled:opacity-30 disabled:cursor-not-allowed hover:text-slate-950"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="h-4 w-px bg-slate-300/70" />
-              <button
-                type="button"
-                aria-label="Next folder"
-                disabled={openIdx === CERTIFICATES.length - 1}
-                onClick={() => handleOpen(openIdx + 1)}
-                className="px-3 py-1.5 text-slate-700 transition disabled:opacity-30 disabled:cursor-not-allowed hover:text-slate-950"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <span className="text-[15px] sm:text-[17px] font-semibold text-slate-800 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-pink-500" />
-              <span>Certificates — Quick Look</span>
-            </span>
-
-            <span className="ml-auto text-xs font-mono text-slate-400">
-              {openIdx + 1} of {CERTIFICATES.length}
-            </span>
-          </div>
-
-          {/* ── Mobile Horizontal Folder Tab Switcher (Small Screens) ── */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-2 md:hidden">
-            {CERTIFICATES.map((cert, idx) => (
-              <button
-                key={cert.id}
-                type="button"
-                onClick={() => handleOpen(idx)}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-                  openIdx === idx
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-600 hover:bg-white/40"
-                }`}
-              >
-                <span>{cert.tabLabel}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* ── THE FOLDER ACCORDION DECK ── */}
-          <div
-            className="flex flex-row items-stretch w-full gap-2 sm:gap-3 rounded-[24px] p-2 sm:p-3 bg-white/40 border border-white/70 shadow-inner overflow-hidden"
-            style={{ minHeight: 600 }}
-          >
-            {CERTIFICATES.map((cert, idx) => {
-              const isOpen = openIdx === idx;
-
+        {/* ===================== DESKTOP: folders side by side ===================== */}
+        <div data-reveal className="hidden lg:block">
+          <div className="cf-stack flex h-[592px] items-stretch pt-8">
+            {CERTS.map((cert, i) => {
+              const open = openIdx === i;
               return (
                 <div
                   key={cert.id}
-                  onClick={() => handleOpen(idx)}
-                  onMouseEnter={() => handleMouseEnter(idx)}
-                  onMouseLeave={handleMouseLeave}
-                  className={`relative flex flex-col cursor-pointer overflow-hidden rounded-[22px] sm:rounded-[26px] border transition-all ${
-                    isOpen
-                      ? "shadow-2xl shadow-pink-500/15"
-                      : "hover:-translate-y-1 shadow-md hover:shadow-xl hover:shadow-pink-500/10"
-                  }`}
+                  className={`cf-folder relative -ml-3 first:ml-0 ${open ? "is-open" : ""}`}
                   style={{
-                    /* Ultra-smooth cubic bezier accordion animation */
-                    flex: isOpen ? "4.2 1 0%" : "0.34 1 0%",
-                    transition: "flex 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s ease, box-shadow 0.4s ease",
-                    background: cert.theme.bgGradient,
-                    borderColor: isOpen ? cert.theme.border : "rgba(255, 255, 255, 0.75)",
-                    minWidth: 50,
+                    ...vars(i, { "--g": open ? 7 : 1 }),
+                    zIndex: open ? 50 : i + 1,
                   }}
+                  onMouseEnter={() => hoverOpen(i)}
+                  onMouseLeave={cancelHover}
                 >
-                  {/* Subtle Fold Crease Line */}
-                  <div className="absolute inset-1.5 rounded-[18px] border border-white/60 pointer-events-none" />
-
-                  {/* ══════════════════════════════════════════════════ */}
-                  {/* 1. COLLAPSED FOLDER SPINE VIEW                      */}
-                  {/* ══════════════════════════════════════════════════ */}
-                  <div
-                    className={`absolute inset-0 flex flex-col items-center justify-between p-3 sm:p-4 transition-all duration-300 pointer-events-none ${
-                      isOpen ? "opacity-0 scale-95 pointer-events-none" : "opacity-100 scale-100"
-                    }`}
-                  >
-                    {/* Top: Folder Number Badge */}
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 shadow-2xs border border-pink-100 flex items-center justify-center text-[10px] sm:text-[11px] font-mono font-bold text-slate-700">
-                      {cert.folderNumber}
-                    </div>
-
-                    {/* Staggered Vertical Tab with White Pill */}
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center"
-                      style={{ top: `${cert.tabPositionPercent}%` }}
-                    >
-                      <div
-                        className="flex items-center gap-1.5 px-2 py-3 rounded-full bg-white/95 shadow-md border border-pink-200/80 transition-transform duration-300 hover:scale-105"
-                        style={{
-                          writingMode: "vertical-rl",
-                          transform: "rotate(180deg)",
-                        }}
-                      >
-                        <span
-                          className="text-[11px] font-semibold tracking-wide uppercase whitespace-nowrap"
-                          style={{ color: cert.theme.pillText }}
-                        >
-                          {cert.tabLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Bottom: Date Pill */}
-                    <div
-                      className="px-2 py-1.5 rounded-full bg-white/75 border border-white text-[9px] font-mono font-bold text-slate-500 whitespace-nowrap"
-                      style={{
-                        writingMode: "vertical-rl",
-                        transform: "rotate(180deg)",
-                      }}
-                    >
-                      {cert.date}
-                    </div>
+                  <div className="cf-peek" style={{ transform: `rotate(${i % 2 ? 0.8 : -0.8}deg)` }} />
+                  <div className="cf-tab">
+                    <span>{num(i)}</span>
+                    <span className="cf-tab-label">{cert.tab}</span>
                   </div>
 
-                  {/* ══════════════════════════════════════════════════ */}
-                  {/* 2. EXPANDED FOLDER DOSSIER VIEW                     */}
-                  {/* ══════════════════════════════════════════════════ */}
-                  <div
-                    className={`flex flex-col h-full w-full p-4 sm:p-6 transition-all duration-500 ${
-                      isOpen
-                        ? "opacity-100 scale-100 pointer-events-auto"
-                        : "opacity-0 scale-95 pointer-events-none"
-                    }`}
-                  >
-                    {/* Folder Top Bar */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b border-pink-200/50 gap-2.5">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/90 text-emerald-700 border border-emerald-200 text-[10px] font-mono font-bold shadow-2xs">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Officially Verified
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            FOLDER #{cert.folderNumber} • {cert.date}
-                          </span>
-                        </div>
-
-                        <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                          {cert.title}
-                        </h3>
-
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                          <Building2 className="w-3.5 h-3.5 text-pink-500" />
-                          <span>{cert.issuer}</span>
-                        </div>
+                  <div className="cf-panel absolute inset-0 overflow-hidden rounded-[20px]">
+                    {/* closed face */}
+                    <div className="cf-closed absolute inset-0">
+                      <div className="absolute left-1/2 top-4 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-white/90 font-mono text-[11px] font-bold shadow-sm" style={{ color: "var(--ink)" }}>
+                        {num(i)}
                       </div>
-
-                      {/* Actions: Download + Open PDF */}
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={cert.pdfPath}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            playUiClick(true);
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-white hover:bg-pink-50 border border-pink-200/80 text-slate-700 hover:text-pink-600 text-xs font-bold transition shadow-2xs flex items-center gap-1.5 active:scale-95"
-                          title="Open full PDF in new tab"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Open PDF</span>
-                        </a>
-
-                        <a
-                          href={cert.pdfPath}
-                          download
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            playUiClick(true);
-                          }}
-                          className="px-3.5 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold transition shadow-md shadow-pink-600/20 flex items-center gap-1.5 hover:scale-[1.02] active:scale-95"
-                          title="Download PDF"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Download</span>
-                        </a>
+                      <div
+                        className="cf-sticker absolute left-1/2 -translate-x-1/2 rounded-full px-2 py-3 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                        style={{ top: `${cert.stickerAt + 10}%`, writingMode: "vertical-rl", transform: "translateX(-50%) rotate(180deg)" }}
+                      >
+                        {cert.tab}
                       </div>
-                    </div>
-
-                    {/* Main Content Area: Framed Document Display */}
-                    <div className="flex-1 flex flex-col min-h-0 bg-white rounded-2xl border border-pink-200/80 shadow-md p-2.5 sm:p-3 overflow-hidden relative">
-                      
-                      {/* Corner Mounts */}
-                      <div className="absolute top-2 left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-pink-300 pointer-events-none z-10" />
-                      <div className="absolute top-2 right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-pink-300 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-pink-300 pointer-events-none z-10" />
-                      <div className="absolute bottom-2 right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-pink-300 pointer-events-none z-10" />
-
-                      {/* Clean Responsive PDF Viewer */}
-                      <div className="relative w-full h-full rounded-xl overflow-hidden bg-slate-50">
-                        <iframe
-                          src={`${cert.pdfPath}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                          className="w-full h-full border-none"
-                          title={cert.title}
+                      <div
+                        className="absolute bottom-4 left-1/2 whitespace-nowrap font-mono text-[10px] font-semibold opacity-60"
+                        style={{ color: "var(--ink)", writingMode: "vertical-rl", transform: "translateX(-50%) rotate(180deg)" }}
+                      >
+                        {cert.date}
+                      </div>
+                      {!open && (
+                        <button
+                          type="button"
+                          aria-label={`Open ${cert.title}`}
+                          className="absolute inset-0 z-10 cursor-pointer outline-none"
+                          onClick={() => openFolder(i)}
+                          onFocus={() => openFolder(i)}
                         />
-                      </div>
+                      )}
                     </div>
 
-                    {/* Bottom Details Footer */}
-                    <div className="pt-3 mt-3 border-t border-pink-200/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <p className="text-xs text-slate-600 line-clamp-1 max-w-lg">
-                        {cert.summary}
-                      </p>
-                      
-                      {/* Competency Tags */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {cert.skills.slice(0, 3).map((skill) => (
-                          <span
-                            key={skill}
-                            className="px-2.5 py-0.5 rounded-lg bg-white/80 border border-pink-200/70 text-[10px] font-medium text-slate-700 shadow-2xs"
-                          >
-                            {skill}
-                          </span>
-                        ))}
+                    {/* open face: certificate sliding out of a front pocket */}
+                    <div className="cf-open absolute inset-y-0 left-0 min-w-[540px] w-full">
+                      <button
+                        type="button"
+                        aria-label={`Enlarge ${cert.title}`}
+                        onClick={() => {
+                          playUiClick(true);
+                          setZoom(i);
+                        }}
+                        className="cf-paper absolute bottom-[37%] left-[6%] right-[6%] top-[30px] cursor-zoom-in rounded-md p-2 outline-none"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={cert.img}
+                          alt={cert.title}
+                          loading="lazy"
+                          draggable={false}
+                          className="h-full w-full object-contain"
+                        />
+                      </button>
+                      <Paperclip className="cf-clipper pointer-events-none absolute right-[11%] top-[6px] z-10 w-7 drop-shadow" />
+                      <div className="cf-pocket absolute inset-x-0 bottom-0 h-[38%] rounded-t-[26px] p-5 pt-6">
+                        <Details cert={cert} />
                       </div>
                     </div>
-
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Bottom Dot Indicators */}
-          <div className="flex items-center justify-between mt-4 px-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-400">
-                Active folder:
-              </span>
-              <div className="flex items-center gap-1.5">
-                {CERTIFICATES.map((cert, idx) => (
-                  <button
-                    key={cert.id}
-                    onClick={() => handleOpen(idx)}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      openIdx === idx
-                        ? "w-8 bg-pink-600"
-                        : "w-2 bg-pink-200 hover:bg-pink-300"
-                    }`}
-                    title={cert.title}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[11px] font-mono text-slate-400 hidden sm:block">
-              Hover over any tab or use arrow keys ← → to browse
-            </p>
-          </div>
-
         </div>
 
+        {/* ===================== MOBILE: folders stacked vertically ===================== */}
+        <div data-reveal className="lg:hidden">
+          <div className="cf-stack flex flex-col gap-9 pt-6">
+            {CERTS.map((cert, i) => {
+              const open = openIdx === i;
+              return (
+                <div key={cert.id} className={`relative ${open ? "is-open" : ""}`} style={vars(i)}>
+                  <div className="cf-tab" style={{ top: -26, height: 28 }}>
+                    <span>{num(i)}</span>
+                    <span className="cf-tab-label">{cert.tab}</span>
+                  </div>
+                  <div className="cf-panel relative overflow-hidden rounded-[20px]">
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() => (open ? setOpenIdx(-1) : openFolder(i))}
+                      className="relative z-10 flex w-full items-center gap-3 p-3.5 text-left outline-none"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 font-mono text-[11px] font-bold shadow-sm" style={{ color: "var(--ink)" }}>
+                        {num(i)}
+                      </span>
+                      <span className="cf-sticker rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wide">
+                        {cert.tab}
+                      </span>
+                      <span className="ml-auto font-mono text-[11px] font-semibold opacity-60" style={{ color: "var(--ink)" }}>
+                        {cert.date}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 shrink-0 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+                        style={{ color: "var(--ink)" }}
+                      />
+                    </button>
+
+                    <div className="cf-reveal relative z-10">
+                      <div className="overflow-hidden">
+                        <div className="px-3.5 pb-3.5">
+                          <button
+                            type="button"
+                            aria-label={`Enlarge ${cert.title}`}
+                            onClick={() => {
+                              playUiClick(true);
+                              setZoom(i);
+                            }}
+                            className="cf-paper relative block w-full rounded-md p-1.5"
+                            style={{ transform: open ? "rotate(-.5deg)" : undefined }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={cert.img}
+                              alt={cert.title}
+                              loading="lazy"
+                              draggable={false}
+                              className="block h-auto max-h-[60vh] w-full object-contain"
+                            />
+                          </button>
+                          <Paperclip className="pointer-events-none absolute right-6 top-2 z-10 w-6 drop-shadow" />
+                          <div className="cf-pocket mt-3 rounded-2xl p-4" style={{ transform: "none" }}>
+                            <Details cert={cert} compact />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+      {/* ===================== Lightbox (image only, so it never lags) ===================== */}
+      {zoom !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={() => setZoom(null)}
+        >
+          <div
+            role="dialog"
+            aria-label={CERTS[zoom].title}
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[24px] border border-white/80 bg-white/70 shadow-2xl backdrop-blur-2xl"
+          >
+            <div className="flex items-center gap-3 border-b border-white/70 px-4 py-3">
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setZoom(null)}
+                className="group flex h-3 w-3 items-center justify-center rounded-full bg-[#ff5f57] ring-1 ring-black/10"
+              >
+                <X className="h-2 w-2 text-[#7f1d1d] opacity-0 group-hover:opacity-100" />
+              </button>
+              <span className="truncate text-sm font-semibold text-slate-800">{CERTS[zoom].title}</span>
+              <div className="ml-auto flex gap-2">
+                <a href={href(CERTS[zoom].pdf)} target="_blank" rel="noopener noreferrer" className="cf-pill cf-pill-pink">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>View PDF</span>
+                </a>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-[#f6efe6]/60 p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={CERTS[zoom].img} alt={CERTS[zoom].title} className="mx-auto block max-h-[75vh] w-auto max-w-full rounded-lg shadow-lg" />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

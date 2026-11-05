@@ -13,6 +13,7 @@ import {
   Layers,
   X,
   User,
+  Code2,
   Briefcase,
   Film,
   Award,
@@ -90,6 +91,7 @@ export const ControlCenterModal: React.FC<ControlCenterModalProps> = ({
 
   const navItems = [
     { id: "about",        label: "About Me",      icon: <User        className="w-5 h-5" />, color: "#f2a6bd" },
+    { id: "tech-stack",   label: "Tech Stack",    icon: <Code2       className="w-5 h-5" />, color: "#f472b6" },
     { id: "projects",     label: "Projects",       icon: <Briefcase   className="w-5 h-5" />, color: "#93c5fd" },
     { id: "certificates", label: "Certifications", icon: <Award       className="w-5 h-5" />, color: "#c4b5fd" },
     { id: "achievements", label: "Achievements",   icon: <Film        className="w-5 h-5" />, color: "#fcd34d" },

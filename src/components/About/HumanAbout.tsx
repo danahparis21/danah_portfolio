@@ -2,7 +2,7 @@
 
 import React, { useEffect, useId, useRef } from "react";
 import Image from "next/image";
-import { MapPin, Sprout, Cookie, Pencil, Mail, FolderOpen } from "lucide-react";
+import { MapPin, Sprout, Cookie, Pencil } from "lucide-react";
 import { PORTFOLIO_DATA } from "@/data/portfolioData";
 import { playUiClick } from "@/utils/sound";
 
@@ -395,7 +395,7 @@ export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
         </div>
 
         {/* ------------------------- Chapter 2: tech stack ------------------------- */}
-        <div className="space-y-4">
+        <div id="tech-stack" className="scroll-mt-16 space-y-4">
           <span data-reveal className="ha-pill" style={v(0)}>
             <span className="h-2 w-2 rounded-full bg-pink-400" />
             <span>Tech stack</span>
@@ -432,24 +432,6 @@ export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* ------------------------- Closing ------------------------- */}
-        <div data-reveal className="mt-24 text-center" style={v(0)}>
-          <p className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-            That&apos;s the short version.
-          </p>
-          <p className="mt-2 text-slate-500">The longer one lives in my projects.</p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button type="button" onClick={() => openFolder("projects")} className="ha-pill ha-pill-pink ha-btn">
-              <FolderOpen className="h-4 w-4" />
-              <span>Open Projects</span>
-            </button>
-            <a href={`mailto:${profile.email}`} onClick={() => playUiClick(true)} className="ha-pill ha-btn">
-              <Mail className="h-4 w-4" />
-              <span>Say hello</span>
-            </a>
-          </div>
         </div>
       </div>
     </section>

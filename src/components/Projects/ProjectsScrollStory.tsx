@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
+  FolderOpen,
+  Mail,
 } from "lucide-react";
 import { GithubIcon } from "@/components/UI/Icons";
 import { PORTFOLIO_DATA, Project } from "@/data/portfolioData";
@@ -618,6 +620,34 @@ export const ProjectsScrollStory: React.FC = () => {
             </div>
 
           </article>
+
+          {/* ── Closing Callout: More Projects ── */}
+          <div data-reveal className="mt-16 sm:mt-20 text-center pb-8">
+            <p className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+              That&apos;s the short version.
+            </p>
+            <p className="mt-2 text-slate-500">The longer one lives in my projects archive.</p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href="https://github.com/danahparis21"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => playUiClick(true)}
+                className="pj-pill pj-pill-pink"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span>More Projects</span>
+              </a>
+              <a
+                href={`mailto:${PORTFOLIO_DATA.profile.email}`}
+                onClick={() => playUiClick(true)}
+                className="pj-pill"
+              >
+                <Mail className="h-4 w-4" />
+                <span>Say hello</span>
+              </a>
+            </div>
+          </div>
         </div>
 
       </div>
