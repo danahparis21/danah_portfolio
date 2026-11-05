@@ -1,0 +1,457 @@
+"use client";
+
+import React, { useEffect, useId, useRef } from "react";
+import Image from "next/image";
+import { MapPin, Sprout, Cookie, Pencil, Mail, FolderOpen } from "lucide-react";
+import { PORTFOLIO_DATA } from "@/data/portfolioData";
+import { playUiClick } from "@/utils/sound";
+
+interface HumanAboutProps {
+  /** Called with a folder id (e.g. "projects"). Falls back to scrolling to #id. */
+  onFolderClick?: (id: string) => void;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Content (kept short on purpose)                                    */
+/* ------------------------------------------------------------------ */
+const QUOTE =
+  "I am always doing what I can't do yet in order to learn how to do it.";
+
+const OFF_SCREEN = [
+  { label: "Plants", Icon: Sprout },
+  { label: "Baking", Icon: Cookie },
+  { label: "Sketching", Icon: Pencil },
+];
+
+const STACK = [
+  {
+    key: "ai",
+    title: "AI & ML",
+    note: "The part I enjoy most.",
+    span: "md:col-span-4",
+    items: ["MediaPipe", "MobileNetV2", "LSTM", "TensorFlow", "scikit-learn"],
+  },
+  {
+    key: "frameworks",
+    title: "Frameworks",
+    span: "md:col-span-2",
+    items: ["React Native", "Expo", "React.js", "Laravel", "Tailwind CSS"],
+  },
+  {
+    key: "languages",
+    title: "Languages",
+    span: "md:col-span-2",
+    items: ["Python", "JavaScript", "PHP", "Java", "C++", "HTML/CSS"],
+  },
+  {
+    key: "tools",
+    title: "Tools",
+    span: "md:col-span-4",
+    items: ["Docker", "Figma", "Canva", "MySQL", "Supabase", "Git & GitHub", "XAMPP"],
+  },
+] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Small pieces                                                       */
+/* ------------------------------------------------------------------ */
+const v = (delay: number, x?: string) =>
+  ({ "--d": `${delay}ms`, ...(x ? { "--x": x } : {}) }) as React.CSSProperties;
+
+const FolderIcon: React.FC = () => {
+  const uid = useId().replace(/:/g, "");
+  return (
+    <svg
+      viewBox="0 0 120 94"
+      className="w-full drop-shadow-[0_10px_12px_rgba(236,120,160,0.3)]"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={`${uid}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f9c0d1" />
+          <stop offset="1" stopColor="#f3a6be" />
+        </linearGradient>
+        <linearGradient id={`${uid}f`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffe0e8" />
+          <stop offset="1" stopColor="#ffc2d2" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M6 0H38C46 0 48 8 56 8H108A12 12 0 0 1 120 20V82A12 12 0 0 1 108 94H12A12 12 0 0 1 0 82V6A6 6 0 0 1 6 0Z"
+        fill={`url(#${uid}b)`}
+      />
+      <g className="transition-transform duration-300 group-hover:-translate-y-[6px]">
+        <rect x="7" y="14" width="106" height="50" rx="7" fill="#ffffff" />
+      </g>
+      <path
+        d="M0 28A12 12 0 0 1 12 16H108A12 12 0 0 1 120 28V82A12 12 0 0 1 108 94H12A12 12 0 0 1 0 82Z"
+        fill={`url(#${uid}f)`}
+      />
+    </svg>
+  );
+};
+
+/* Headline whose words slide up one by one when it scrolls into view */
+const Headline: React.FC<{ words: string[]; accentFrom: number }> = ({
+  words,
+  accentFrom,
+}) => (
+  <h2
+    data-words
+    className="ha-words text-5xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-7xl"
+  >
+    {words.map((w, i) => (
+      <React.Fragment key={w + i}>
+        <span className="ha-mask">
+          <span
+            className={`ha-word ${i >= accentFrom ? "ha-grad" : ""}`}
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            {w}
+          </span>
+        </span>{" "}
+      </React.Fragment>
+    ))}
+  </h2>
+);
+
+export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
+  const rootRef = useRef<HTMLElement>(null);
+  const profile = PORTFOLIO_DATA.profile;
+
+  const openFolder = (id: string) => {
+    playUiClick(true);
+    if (onFolderClick) return onFolderClick(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const reveals = root.querySelectorAll<HTMLElement>("[data-reveal],[data-words]");
+    const words = Array.from(root.querySelectorAll<HTMLElement>("[data-w]"));
+
+    if (reduce) {
+      reveals.forEach((el) => el.classList.add("is-in"));
+      words.forEach((w) => (w.style.opacity = "1"));
+      return;
+    }
+
+    /* 1. Reveal on scroll (keyframe animations, staggered via --d / --i) */
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-in");
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.2, rootMargin: "0px 0px -8% 0px" }
+    );
+    reveals.forEach((el) => io.observe(el));
+
+    /* 2. Scroll-linked effects: parallax, word-by-word quote, growing strap */
+    const parallax = Array.from(root.querySelectorAll<HTMLElement>("[data-speed]"));
+    const scrub = root.querySelector<HTMLElement>("[data-scrub]");
+    const grow = root.querySelector<HTMLElement>("[data-grow]");
+    let raf = 0;
+
+    const update = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+
+      for (const el of parallax) {
+        const host = el.parentElement;
+        if (!host) continue;
+        const r = host.getBoundingClientRect();
+        if (r.bottom < -300 || r.top > vh + 300) continue;
+        const d = r.top + r.height / 2 - vh / 2;
+        const speed = parseFloat(el.dataset.speed || "0");
+        const spin = parseFloat(el.dataset.spin || "0");
+        const base = parseFloat(el.dataset.base || "0");
+        const scale = parseFloat(el.dataset.scale || "1");
+        el.style.transform = `translate3d(0, ${(-d * speed).toFixed(1)}px, 0) rotate(${(
+          base +
+          d * spin
+        ).toFixed(2)}deg) scale(${scale})`;
+      }
+
+      if (scrub) {
+        const r = scrub.getBoundingClientRect();
+        const p = Math.min(1, Math.max(0, (vh * 0.88 - r.top) / (vh * 0.5)));
+        words.forEach((w, i) => {
+          const o = Math.min(1, Math.max(0, p * words.length - i));
+          w.style.opacity = (0.16 + 0.84 * o).toFixed(2);
+        });
+      }
+
+      if (grow) {
+        const r = (grow.parentElement as HTMLElement).getBoundingClientRect();
+        const p = Math.min(1, Math.max(0, (vh * 0.85 - r.top) / (r.height + vh * 0.1)));
+        grow.style.transform = `scaleY(${p.toFixed(3)})`;
+      }
+    };
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, []);
+
+  return (
+    <section
+      id="about"
+      ref={rootRef}
+      className="relative scroll-mt-12 overflow-hidden bg-[#f8f8fa] text-slate-800"
+    >
+      <style>{`
+        @keyframes ha-rise { from { opacity: 0; transform: translate3d(var(--x, 0), 40px, 0) scale(.95); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
+        @keyframes ha-word { from { transform: translateY(110%); } to { transform: translateY(0); } }
+        @keyframes ha-pop  { 0% { opacity: 0; transform: scale(.6) translateY(8px); } 70% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: none; } }
+        @keyframes ha-bob  { 0%,100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+
+        [data-reveal] { opacity: 0; }
+        [data-reveal].is-in { opacity: 1; animation: ha-rise .9s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: var(--d, 0ms); }
+
+        .ha-mask { display: inline-block; overflow: hidden; padding: 0 .06em .14em; margin: 0 -.06em -.14em; vertical-align: bottom; }
+        .ha-word { display: inline-block; transform: translateY(110%); }
+        .ha-words.is-in .ha-word { transform: none; animation: ha-word .95s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: calc(var(--i) * 110ms); }
+        .ha-grad { background: linear-gradient(135deg, #0b0b10 10%, #4a1236 50%, #f0568f 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+        .ha-chip { opacity: 0; }
+        .is-in .ha-chip { opacity: 1; animation: ha-pop .6s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: calc(260ms + var(--i) * 60ms); }
+        .ha-bob { animation: ha-bob 7s ease-in-out infinite; }
+
+        .ha-tile {
+          position: relative; border-radius: 30px;
+          background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.7));
+          border: 1px solid rgba(255,255,255,.9);
+          box-shadow: 0 0 0 1px rgba(15,23,42,.06), 0 1px 0 #fff inset, 0 26px 40px -26px rgba(76,57,120,.3);
+          -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+          transition: transform .4s cubic-bezier(.34,1.4,.5,1), box-shadow .3s;
+        }
+        .ha-tile:hover { transform: translateY(-4px); box-shadow: 0 0 0 1px rgba(15,23,42,.06), 0 1px 0 #fff inset, 0 34px 46px -26px rgba(76,57,120,.38); }
+
+        .ha-pill {
+          position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .4rem;
+          border-radius: 9999px; border: 1px solid rgba(148,163,184,.55); padding: .35rem .8rem;
+          font-size: 12.5px; font-weight: 500; color: #334155; white-space: nowrap;
+          background: linear-gradient(180deg, #fff, #f1f2f5);
+          box-shadow: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(15,23,42,.07), 0 4px 10px -6px rgba(15,23,42,.3);
+          transition: transform .15s, filter .15s;
+        }
+        .ha-pill > * { position: relative; z-index: 1; }
+        .ha-pill-pink {
+          color: #4a1230; border-color: rgba(224,98,143,.7); text-shadow: 0 1px 0 rgba(255,255,255,.55);
+          background: linear-gradient(180deg, #ffc9db 0%, #ff9bbd 48%, #fb7fa9 52%, #ffa8c6 100%);
+          box-shadow: inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 8px 16px -6px rgba(244,114,182,.6);
+        }
+        .ha-pill-pink::before { content: ""; position: absolute; z-index: 0; left: 12px; right: 12px; top: 3px; height: 44%; border-radius: 9999px; background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.05)); }
+        .ha-btn { padding: .75rem 1.5rem; font-size: 15px; }
+        button.ha-pill:active, a.ha-pill:active { transform: translateY(1px); filter: brightness(.96); }
+
+        @media (prefers-reduced-motion: reduce) {
+          [data-reveal] { opacity: 1; }
+          [data-reveal].is-in, .ha-words.is-in .ha-word, .is-in .ha-chip, .ha-bob { animation: none; }
+          .ha-word, .ha-chip { opacity: 1; transform: none; }
+        }
+      `}</style>
+
+      {/* Ambient blush gradient (dotted pattern removed) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 82% 14%, rgba(255,214,230,0.25), transparent 45%), radial-gradient(circle at 12% 62%, rgba(255,214,230,0.18), transparent 45%)",
+          backgroundSize: "100% 100%, 100% 100%",
+        }}
+      />
+
+      {/* folders drifting at different speeds (parallax) */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden md:block">
+        {[
+          { cls: "right-[7%] top-[5%] w-20", speed: 0.14, base: 8 },
+          { cls: "left-[2%] top-[30%] w-16", speed: -0.1, base: -12 },
+          { cls: "right-[3%] top-[56%] w-24", speed: 0.2, base: 6 },
+          { cls: "left-[5%] top-[80%] w-16", speed: 0.12, base: 3 },
+        ].map((f, i) => (
+          <div key={i} className={`absolute ${f.cls}`}>
+            <div data-speed={f.speed} data-base={f.base} data-spin="0.01" className="ha-bob will-change-transform" style={{ animationDelay: `${i * -1.7}s` }}>
+              <FolderIcon />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-24 pt-24 sm:pt-32">
+        {/* ------------------------- Chapter 1: about me ------------------------- */}
+        <div className="space-y-4">
+          <span data-reveal className="ha-pill" style={v(0)}>
+            <span className="h-2 w-2 rounded-full bg-pink-400" />
+            <span>About me</span>
+          </span>
+          <Headline words={["Hi,", "I'm", "Danah."]} accentFrom={2} />
+          <p data-reveal className="max-w-md text-lg text-slate-500" style={v(450)}>
+            I build AI-powered apps that feel human to use.
+          </p>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 gap-4 md:auto-rows-[200px] md:grid-cols-4">
+          {/* photo */}
+          <div data-reveal className="ha-tile min-h-[420px] overflow-hidden md:col-span-2 md:row-span-2" style={v(0, "-40px")}>
+            <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+              <div data-speed="0.07" data-scale="1.16" className="absolute inset-0 will-change-transform">
+                <Image
+                  src={profile.avatar}
+                  alt={profile.name}
+                  fill
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  className="object-cover object-top"
+                />
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/30 to-transparent" />
+            <span className="ha-pill ha-pill-pink absolute left-5 top-5"><span>Me</span></span>
+            <span className="ha-pill absolute bottom-5 left-5">
+              <MapPin className="h-3.5 w-3.5 text-pink-500" />
+              <span>Batangas, Philippines</span>
+            </span>
+          </div>
+
+          {/* bio */}
+          <div data-reveal className="ha-tile flex flex-col justify-center p-7 md:col-span-2" style={v(120, "40px")}>
+            <p className="text-xl font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl">
+              I grew up tinkering with computers and never really stopped.
+            </p>
+            <p className="mt-2 text-slate-500">
+              Now I turn curiosity into apps people actually enjoy using.
+            </p>
+          </div>
+
+          {/* how I work */}
+          <div data-reveal className="ha-tile flex flex-col justify-between p-6" style={v(240)}>
+            <span className="text-sm font-semibold text-slate-900">How I work</span>
+            <p className="text-[15px] leading-snug text-slate-500">
+              Listen first, ask lots of questions, then test with real users.
+            </p>
+          </div>
+
+          {/* away from the screen */}
+          <div data-reveal className="ha-tile flex flex-col justify-between p-6" style={v(360)}>
+            <span className="text-sm font-semibold text-slate-900">Off screen</span>
+            <ul className="space-y-2">
+              {OFF_SCREEN.map(({ label, Icon }) => (
+                <li key={label} className="flex items-center gap-2.5 text-[15px] text-slate-600">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-b from-pink-50 to-pink-100 text-pink-600 ring-1 ring-pink-200/70">
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* quote: words light up as you scroll */}
+          <div
+            data-reveal
+            className="ha-tile flex flex-col justify-center gap-4 overflow-hidden bg-gradient-to-br from-pink-50/90 to-white/80 p-8 md:col-span-4 md:px-12"
+            style={v(0)}
+          >
+            <span aria-hidden className="absolute -top-3 left-6 select-none font-serif text-[9rem] leading-none text-pink-200/80">&ldquo;</span>
+            <p data-scrub className="relative max-w-3xl font-serif text-2xl italic leading-snug text-slate-900 sm:text-3xl">
+              {QUOTE.split(" ").map((w, i) => (
+                <span key={i} data-w className="inline-block" style={{ opacity: 0.16 }}>
+                  {w}&nbsp;
+                </span>
+              ))}
+            </p>
+            <span className="ha-pill self-start"><span>Pablo Picasso</span></span>
+          </div>
+        </div>
+
+        {/* strap that grows as you scroll to the next chapter */}
+        <div className="mx-auto my-12 flex h-40 w-[22px] flex-col items-center sm:my-16">
+          <div
+            data-grow
+            className="h-full w-full origin-top rounded-b-full"
+            style={{
+              transform: "scaleY(0)",
+              background:
+                "repeating-linear-gradient(180deg, rgba(255,255,255,.55) 0 5px, transparent 5px 11px) center/2px 100% no-repeat, #f8c6d6",
+              boxShadow: "inset 0 0 0 1px #e79ab5",
+            }}
+          />
+        </div>
+
+        {/* ------------------------- Chapter 2: tech stack ------------------------- */}
+        <div className="space-y-4">
+          <span data-reveal className="ha-pill" style={v(0)}>
+            <span className="h-2 w-2 rounded-full bg-pink-400" />
+            <span>Tech stack</span>
+          </span>
+          <Headline words={["What's", "in", "my", "toolbox"]} accentFrom={3} />
+          <p data-reveal className="max-w-md text-lg text-slate-500" style={v(450)}>
+            The things I reach for most.
+          </p>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-6">
+          {STACK.map((s, i) => (
+            <div
+              key={s.key}
+              data-reveal
+              className={`ha-tile group p-7 ${s.span}`}
+              style={v(i % 2 === 0 ? 0 : 140, i % 2 === 0 ? "-30px" : "30px")}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 origin-bottom -rotate-3 transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:rotate-0 group-hover:scale-110">
+                  <FolderIcon />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold tracking-tight text-slate-900">{s.title}</h3>
+                  {"note" in s && <p className="text-sm text-slate-500">{s.note}</p>}
+                </div>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-2">
+                {s.items.map((it, j) => (
+                  <span key={it} className="ha-pill ha-chip" style={{ "--i": j } as React.CSSProperties}>
+                    <span>{it}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ------------------------- Closing ------------------------- */}
+        <div data-reveal className="mt-24 text-center" style={v(0)}>
+          <p className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+            That&apos;s the short version.
+          </p>
+          <p className="mt-2 text-slate-500">The longer one lives in my projects.</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button type="button" onClick={() => openFolder("projects")} className="ha-pill ha-pill-pink ha-btn">
+              <FolderOpen className="h-4 w-4" />
+              <span>Open Projects</span>
+            </button>
+            <a href={`mailto:${profile.email}`} onClick={() => playUiClick(true)} className="ha-pill ha-btn">
+              <Mail className="h-4 w-4" />
+              <span>Say hello</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
