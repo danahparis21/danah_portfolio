@@ -86,6 +86,30 @@ export const ProjectsScrollStory: React.FC = () => {
   const metrics = currentProject.metrics ?? [];
   const isSecretGarden = currentProject.id === "secret-garden";
 
+  // Pause videos when Projects section is scrolled off-screen to save battery & power
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        const v = videoRef.current;
+        const p = phoneRef.current;
+        if (!entry.isIntersecting) {
+          if (v && !v.paused) v.pause();
+          if (p && !p.paused) p.pause();
+        } else {
+          if (v && v.paused && !userPaused.current) v.play().catch(() => {});
+          if (p && p.paused && !userPaused.current) p.play().catch(() => {});
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    io.observe(section);
+    return () => io.disconnect();
+  }, []);
+
   // Reset video playback states on project switch
   useEffect(() => {
     userPaused.current = false;

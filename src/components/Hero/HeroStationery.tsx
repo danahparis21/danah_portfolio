@@ -439,7 +439,24 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("pointercancel", up);
 
-    const io = new IntersectionObserver(([en]) => { visible = en.isIntersecting; });
+    let isLoopRunning = false;
+    const startLoop = () => {
+      if (!isLoopRunning) {
+        isLoopRunning = true;
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    };
+    const stopLoop = () => {
+      isLoopRunning = false;
+      if (raf) cancelAnimationFrame(raf);
+    };
+
+    const io = new IntersectionObserver(([en]) => {
+      visible = en.isIntersecting;
+      if (visible) startLoop();
+      else stopLoop();
+    });
     io.observe(wrap);
 
     const TILT = 0.38;
@@ -447,8 +464,8 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
     const TAU = Math.PI * 2;
 
     const frame = (now: number) => {
+      if (!visible || !isLoopRunning) return;
       raf = requestAnimationFrame(frame);
-      if (!visible) { last = now; return; }
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
