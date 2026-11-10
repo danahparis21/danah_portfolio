@@ -17,11 +17,11 @@ interface HeroStationeryProps {
 /* Scattered pink folders floating across the desktop */
 const FOLDERS = [
   { id: "certificates", label: "Certificates", pos: "left-[41%] top-[24%]", rot: "-rotate-6" },
-  { id: "projects",     label: "Projects",     pos: "left-[57%] top-[17%]", rot: "rotate-3" },
-  { id: "tech-stack",   label: "Tech Stack",   pos: "left-[48%] top-[39%]", rot: "-rotate-3" },
+  { id: "projects", label: "Projects", pos: "left-[57%] top-[17%]", rot: "rotate-3" },
+  { id: "tech-stack", label: "Tech Stack", pos: "left-[48%] top-[39%]", rot: "-rotate-3" },
   { id: "achievements", label: "Achievements", pos: "right-[3%] top-[48%]", rot: "rotate-6" },
-  { id: "contact",      label: "Contact",      pos: "left-[43%] bottom-[6%]", rot: "rotate-3" },
-  { id: "garden",       label: "Secret Garden",pos: "left-[61%] bottom-[8%]", rot: "-rotate-3" },
+  { id: "contact", label: "Contact", pos: "left-[43%] bottom-[6%]", rot: "rotate-3" },
+  { id: "garden", label: "Secret Garden", pos: "left-[61%] bottom-[8%]", rot: "-rotate-3" },
 ] as const;
 
 /* Social links */
@@ -103,21 +103,18 @@ const DraggableFolder: React.FC<{
           }
         }}
         aria-label={`Open ${label}`}
-        className={`group flex flex-col items-center outline-none ${
-          isSm ? "w-20 gap-1" : "w-28 gap-1.5"
-        }`}
+        className={`group flex flex-col items-center outline-none ${isSm ? "w-20 gap-1" : "w-28 gap-1.5"
+          }`}
       >
         <span
-          className={`block origin-bottom transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:-translate-y-1.5 group-hover:rotate-0 group-hover:scale-[1.22] group-focus-visible:rotate-0 group-focus-visible:scale-[1.22] ${
-            isSm ? "w-[48px]" : "w-[78px]"
-          } ${rot}`}
+          className={`block origin-bottom transition-transform duration-300 ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:-translate-y-1.5 group-hover:rotate-0 group-hover:scale-[1.22] group-focus-visible:rotate-0 group-focus-visible:scale-[1.22] ${isSm ? "w-[48px]" : "w-[78px]"
+            } ${rot}`}
         >
           <FolderIcon />
         </span>
         <span
-          className={`mt-0.5 whitespace-nowrap rounded-md text-center font-medium leading-tight text-slate-700 bg-white/85 backdrop-blur-sm border border-slate-200/60 shadow-2xs transition-colors duration-150 group-hover:bg-[#007aff] group-hover:text-white group-hover:border-[#007aff] ${
-            isSm ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[12px]"
-          }`}
+          className={`mt-0.5 whitespace-nowrap rounded-md text-center font-medium leading-tight text-slate-700 bg-white/85 backdrop-blur-sm border border-slate-200/60 shadow-2xs transition-colors duration-150 group-hover:bg-[#007aff] group-hover:text-white group-hover:border-[#007aff] ${isSm ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[12px]"
+            }`}
         >
           {label}
         </span>
@@ -471,8 +468,8 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
       const scale = isMobile
         ? Math.min(h / 3.2, w / 2.1)
         : isTablet
-        ? Math.min(h / 2.85, w / 1.95)
-        : Math.min(h / 2.28, w / 1.56);
+          ? Math.min(h / 2.85, w / 1.95)
+          : Math.min(h / 2.28, w / 1.56);
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);

@@ -200,6 +200,73 @@ export const PORTFOLIO_DATA = {
         accentColor: "text-amber-800",
       },
     },
+    {
+      id: "lakbay",
+      projectNumber: "PROJECT 03",
+      title: "LAKBAY",
+      subtitle: "Trail Discovery & Real-Time Hiking Management Platform",
+      badge: "Software Engineer & Backend Lead",
+      period: "2025 – 2026",
+      role: "Software Engineer & Backend Developer",
+      description:
+        "A full-featured hiking management and eco-tourism platform built for the Municipality of Nasugbu, Batangas. Connects Hikers, Tour Guides, Mountain Managers, and the Municipal Tourism Office with real-time GPS tracking, Tesseract OCR guide verification, and automated GCash payments.",
+      bullets: [
+        "Architected core REST APIs in PHP 8.2 and normalized MySQL database powering 4 unified user portals.",
+        "Engineered real-time GPS trail tracking, boundary violation alerts, and crowd density heatmaps using Leaflet.js.",
+        "Integrated Tesseract OCR with ImageMagick for automated guide ID verification and credential validation.",
+        "Designed time-limited GCash payment validation with automated cron jobs and multi-role transactional messaging.",
+      ],
+      metrics: [
+        { label: "Mountains", value: "4 Summits" },
+        { label: "User Roles", value: "4 Portals" },
+        { label: "OCR Vision", value: "Tesseract" },
+        { label: "Mapping", value: "Leaflet.js" },
+      ],
+      tags: ["PHP 8.2", "MySQL", "Docker", "Leaflet.js", "Tesseract OCR", "REST APIs", "Apache", "ImageMagick"],
+      githubUrls: [
+        { label: "Project Repository", url: "https://github.com/danahparis21" },
+      ],
+      colorTheme: {
+        tabBg: "bg-emerald-600",
+        cardBg: "bg-[#064e3b]",
+        textColor: "text-white",
+        accentColor: "text-emerald-400",
+      },
+    },
+    {
+      id: "ai-reviewer",
+      projectNumber: "PROJECT 04",
+      title: "AI Assisted Reviewer",
+      subtitle: "AI-Guided Interactive Technical Exam Reviewer",
+      badge: "Creator & AI Engineer",
+      period: "2025 – 2026",
+      role: "Creator, Full-Stack & AI Integration Engineer",
+      description:
+        "An AI-guided, interactive technical exam reviewer engineered with instant Google Gemini reasoning, original scanned exam verification, session-based progress synchronization, and an ambient lo-fi study environment designed to make mastering technical certifications engaging.",
+      bullets: [
+        "Integrated Google Gemini API (gemini-2.5-flash) via Vercel Serverless Functions to generate step-by-step reasoning for chosen and distractor options.",
+        "Engineered lightweight zero-dependency quiz engine with a 100-tile live progress map, missed-question retry modes, and real-time pass/fail projections.",
+        "Built scanned exam page viewer linking each question to original technical diagrams and architecture schematics.",
+        "Adopted by review cohorts with named session keys, JSON export/import progress synchronization, and dark mode tokens.",
+      ],
+      metrics: [
+        { label: "Questions", value: "300+ Items" },
+        { label: "AI Engine", value: "Gemini 2.5" },
+        { label: "Framework", value: "Vanilla JS" },
+        { label: "Status", value: "Live Vercel" },
+      ],
+      tags: ["Google Gemini API", "Vercel Functions", "JavaScript", "Custom CSS", "Exam Engine", "JSON Data"],
+      liveUrl: "https://itpassportreviewer.vercel.app/",
+      githubUrls: [
+        { label: "Project Repository", url: "https://github.com/danahparis21" },
+      ],
+      colorTheme: {
+        tabBg: "bg-rose-500",
+        cardBg: "bg-[#fff1f2]",
+        textColor: "text-slate-900",
+        accentColor: "text-rose-600",
+      },
+    },
   ] as Project[],
 
   achievements: [
