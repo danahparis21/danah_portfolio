@@ -292,7 +292,7 @@ export const ProjectsScrollStory: React.FC = () => {
         ))}
       </div>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-28 pt-20 sm:pt-28">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-14 sm:pt-20">
         {/* Header */}
         <div className="mb-10 space-y-3">
           <span data-reveal className="pj-pill pj-chip">
@@ -326,7 +326,7 @@ export const ProjectsScrollStory: React.FC = () => {
           <article className="pj-win relative overflow-hidden rounded-[28px] lg:grid lg:grid-cols-[210px_1fr]">
             
             {/* ---------------- Sidebar (large screens) ---------------- */}
-            <aside className="pj-side hidden flex-col gap-6 p-5 pt-6 lg:flex">
+            <aside className="pj-side hidden flex-col gap-6 p-5 pt-6 lg:flex" style={{ minHeight: 0 }}>
               <TrafficLights />
 
               <div>
@@ -387,6 +387,22 @@ export const ProjectsScrollStory: React.FC = () => {
                   </ul>
                 </div>
               )}
+
+              {/* More Projects link pinned at the bottom of the sidebar */}
+              <div className="mt-auto">
+                <div className="mb-1.5 px-2 text-[13px] text-slate-500">Archive</div>
+                <a
+                  href="https://github.com/danahparis21"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => playUiClick(true)}
+                  className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[13px] font-medium text-pink-600 transition hover:bg-pink-50/60"
+                >
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                  <span>More Projects</span>
+                  <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-pink-300" />
+                </a>
+              </div>
             </aside>
 
             {/* ---------------- Main Content Area ---------------- */}
@@ -621,33 +637,7 @@ export const ProjectsScrollStory: React.FC = () => {
 
           </article>
 
-          {/* ── Closing Callout: More Projects ── */}
-          <div data-reveal className="mt-16 sm:mt-20 text-center pb-8">
-            <p className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-              That&apos;s the short version.
-            </p>
-            <p className="mt-2 text-slate-500">The longer one lives in my projects archive.</p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href="https://github.com/danahparis21"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => playUiClick(true)}
-                className="pj-pill pj-pill-pink"
-              >
-                <FolderOpen className="h-4 w-4" />
-                <span>More Projects</span>
-              </a>
-              <a
-                href={`mailto:${PORTFOLIO_DATA.profile.email}`}
-                onClick={() => playUiClick(true)}
-                className="pj-pill"
-              >
-                <Mail className="h-4 w-4" />
-                <span>Say hello</span>
-              </a>
-            </div>
-          </div>
+          {/* ── Closing Callout removed — archive link is in the sidebar ── */}
         </div>
 
       </div>

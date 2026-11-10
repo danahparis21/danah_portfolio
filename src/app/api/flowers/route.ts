@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 const KEY = "danah:garden:flowers";
 const KEEP = 500; // flowers stored
 const SHOW = 300; // flowers sent to visitors (newest)
-const COLORS = new Set(["#d8503f", "#ee9249", "#f3cb5a", "#f2a6bd", "#3f7a3a"]);
+// New pastel palette + the old one (so flowers saved before the redesign still validate)
+const COLORS = new Set([
+    "#f2a6bd", "#e5799f", "#8fc3ea", "#f4d58a", "#6fb58a",
+    "#d8503f", "#ee9249", "#f3cb5a", "#3f7a3a",
+]);
 
 const getRedis = () => {
     const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;

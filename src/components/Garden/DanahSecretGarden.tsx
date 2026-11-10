@@ -34,19 +34,29 @@ interface Flower {
   t?: number;
 }
 
-const RED = "#d8503f";
-const ORANGE = "#ee9249";
-const YELLOW = "#f3cb5a";
+// Palette pulled from the cherry-blossom meadow: blossom pink, rose, sky, cream and mint
 const BLUSH = "#f2a6bd";
-const LEAF = "#3f7a3a";
+const ROSE = "#e5799f";
+const SKY = "#8fc3ea";
+const CREAM = "#f4d58a";
+const LEAF = "#6fb58a";
 
 const PAINT = [
-  { name: "Poppy", hex: RED },
-  { name: "Apricot", hex: ORANGE },
-  { name: "Butter", hex: YELLOW },
-  { name: "Blush", hex: BLUSH },
-  { name: "Leaf", hex: LEAF },
+  { name: "Blossom", hex: BLUSH },
+  { name: "Rose", hex: ROSE },
+  { name: "Sky", hex: SKY },
+  { name: "Cream", hex: CREAM },
+  { name: "Mint leaf", hex: LEAF },
 ];
+
+/** Flowers saved with the old palette are re-coloured on the fly so the whole meadow matches. */
+const LEGACY: Record<string, string> = {
+  "#d8503f": ROSE,
+  "#ee9249": "#f6b79a",
+  "#f3cb5a": CREAM,
+  "#3f7a3a": LEAF,
+};
+const tone = (c: string) => LEGACY[c] ?? c;
 
 const COOLDOWN_MS = 15000;
 
@@ -105,10 +115,10 @@ const paintStrokes = (ctx: CanvasRenderingContext2D, strokes: Stroke[], k: numbe
     const n = s.p.length / 2;
     const closed = n >= 8 && Math.hypot(s.p[0] - s.p[s.p.length - 2], s.p[1] - s.p[s.p.length - 1]) < 7;
     trace(ctx, s.p, k);
-    ctx.strokeStyle = s.c;
-    ctx.fillStyle = s.c;
+    ctx.strokeStyle = tone(s.c);
+    ctx.fillStyle = tone(s.c);
     if (closed) {
-      ctx.globalAlpha = 0.22;
+      ctx.globalAlpha = 0.4;
       ctx.fill();
     }
     const w = Math.max(minW, s.w * k);
@@ -124,17 +134,34 @@ const paintStrokes = (ctx: CanvasRenderingContext2D, strokes: Stroke[], k: numbe
 
 /* ───────────────────────── starter flowers ───────────────────────── */
 
-const petalLoop = (cx: number, cy: number, ang: number, len: number, wid: number, rand: () => number) => {
+const rot = (x: number, y: number, a: number): [number, number] => [
+  x * Math.cos(a) - y * Math.sin(a),
+  x * Math.sin(a) + y * Math.cos(a),
+];
+
+/** A petal as a closed outline rooted at (cx, cy) and pointing along `ang`. `notch` carves the sakura dip. */
+const petal = (cx: number, cy: number, ang: number, len: number, wid: number, notch: number, rand: () => number) => {
+  const shape: [number, number][] = [
+    [0, 0], [len * 0.5, -wid], [len * 0.92, -wid * 0.6], [len, -wid * 0.14],
+    [len * (1 - notch), 0],
+    [len, wid * 0.14], [len * 0.92, wid * 0.6], [len * 0.5, wid], [0, 0],
+  ];
   const out: number[] = [];
-  const n = 12;
-  for (let i = 0; i < n; i++) {
-    const t = (i / n) * Math.PI * 2;
-    const lx = Math.cos(t) * len * (1 + (rand() - 0.5) * 0.14);
-    const ly = Math.sin(t) * wid * (1 + (rand() - 0.5) * 0.14);
-    out.push(r1(cx + lx * Math.cos(ang) - ly * Math.sin(ang)), r1(cy + lx * Math.sin(ang) + ly * Math.cos(ang)));
+  for (const [x, y] of shape) {
+    const j = 1 + (rand() - 0.5) * 0.1;
+    const [rx, ry] = rot(x * j, y * j, ang);
+    out.push(r1(cx + rx), r1(cy + ry));
   }
-  out.push(out[0], out[1]);
   return out;
+};
+
+/** A pointed leaf (lens shape) growing from (x, y). */
+const leafShape = (x: number, y: number, ang: number, len: number, wid: number) => {
+  const n = 5;
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= n; i++) pts.push(rot(len * (i / n), -wid * Math.sin(Math.PI * (i / n)), ang));
+  for (let i = n - 1; i >= 0; i--) pts.push(rot(len * (i / n), wid * Math.sin(Math.PI * (i / n)), ang));
+  return pts.flatMap(([px, py]) => [r1(x + px), r1(y + py)]);
 };
 
 const spiral = (cx: number, cy: number, r: number) => {
@@ -149,38 +176,50 @@ const spiral = (cx: number, cy: number, r: number) => {
   return out;
 };
 
+/** Three little flower types (sakura, daisy, tulip). Always <= 14 strokes so the server accepts "surprise me". */
 const makeFlower = (seed: number): Stroke[] => {
   const rand = mulberry(seed);
   const lean = (rand() - 0.5) * 14;
   const cx = 50 + lean;
-  const cy = 42;
+  const cy = 40;
+  const x0 = 50 + lean * 0.15;
+  const topY = cy + 10;
+  const stemX = (y: number) => x0 + (cx - x0) * ((97 - y) / (97 - topY));
   const side = rand() > 0.5 ? 1 : -1;
-  const lx = 50 + lean * 0.55;
-  const ly = 78;
-  const strokes: Stroke[] = [
-    { c: LEAF, w: 2.2, p: [r1(50 + lean * 0.15), 97, r1(50 + lean * 0.5), 84, r1(50 + lean * 0.85), 68, r1(cx), 54] },
-    {
-      c: LEAF, w: 1.8,
-      p: [r1(lx), ly, r1(lx + side * 6), ly - 9, r1(lx + side * 15), ly - 6, r1(lx + side * 10), ly + 3, r1(lx), ly],
-    },
-  ];
-  const petalColors = [RED, ORANGE, YELLOW, BLUSH];
-  const pc = petalColors[Math.floor(rand() * petalColors.length)];
-  const centre = pc === YELLOW ? ORANGE : YELLOW;
 
-  if (rand() < 0.28) {
+  const strokes: Stroke[] = [
+    { c: LEAF, w: 2.2, p: [r1(x0), 97, r1(50 + lean * 0.5), 84, r1(50 + lean * 0.85), 68, r1(cx), topY] },
+    { c: LEAF, w: 1.6, p: leafShape(stemX(84), 84, side > 0 ? -0.75 : Math.PI + 0.75, 15, 4.2) },
+    { c: LEAF, w: 1.6, p: leafShape(stemX(70), 70, side > 0 ? Math.PI + 0.65 : -0.65, 11, 3.4) },
+  ];
+
+  const colours = [BLUSH, BLUSH, ROSE, SKY, CREAM];
+  const pc = colours[Math.floor(rand() * colours.length)];
+  const centre = pc === CREAM ? ROSE : CREAM;
+  const kind = rand();
+
+  if (kind < 0.5) {
+    // sakura: five notched petals
+    const base = rand() * Math.PI * 2;
+    for (let k = 0; k < 5; k++) {
+      strokes.push({ c: pc, w: 1.7, p: petal(cx, cy, base + (k / 5) * Math.PI * 2, 11.5, 6.4, 0.16, rand) });
+    }
+    strokes.push({ c: centre, w: 1.6, p: spiral(cx, cy, 3.4) });
+  } else if (kind < 0.78) {
+    // daisy: ring of slim petals
+    const dc = pc === CREAM ? SKY : pc;
+    const base = rand() * Math.PI * 2;
+    for (let k = 0; k < 8; k++) {
+      strokes.push({ c: dc, w: 1.5, p: petal(cx, cy, base + (k / 8) * Math.PI * 2, 12.5, 3.3, 0, rand) });
+    }
+    strokes.push({ c: CREAM, w: 2, p: spiral(cx, cy, 4.8) });
+  } else {
+    // tulip
     strokes.push({
       c: pc, w: 2,
       p: [cx - 11, cy - 12, cx - 12, cy + 2, cx - 6, cy + 12, cx, cy + 14, cx + 6, cy + 12, cx + 12, cy + 2, cx + 11, cy - 12, cx + 5, cy - 4, cx, cy - 13, cx - 5, cy - 4, cx - 11, cy - 12].map(r1),
     });
     strokes.push({ c: pc, w: 1.5, p: [r1(cx), cy - 12, r1(cx + (rand() - 0.5) * 3), cy + 9] });
-  } else {
-    const n = 5 + Math.floor(rand() * 3);
-    for (let k = 0; k < n; k++) {
-      const ang = (k / n) * Math.PI * 2 + rand() * 0.3;
-      strokes.push({ c: pc, w: 1.9, p: petalLoop(cx + Math.cos(ang) * 11, cy + Math.sin(ang) * 11, ang, 9.5, 6, rand) });
-    }
-    strokes.push({ c: centre, w: 1.8, p: spiral(cx, cy, 4.5) });
   }
   return strokes;
 };
@@ -274,16 +313,16 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
   };
 
   /* 3 grass layers, back → front (darkest → brightest) */
-  paintLayer(h - 155, "#2a5620", "#1f3f18", "#1d4c16", 360, 52, 7.1);
-  paintLayer(h - 105, "#387028", "#2a5620", "#2d5f24", 330, 42, 13.3);
-  paintLayer(h - 58, "#4a8a38", "#367028", "#3d7830", 290, 32, 19.7);
+  paintLayer(h - 155, "#dcefd9", "#c7e4cc", "#9bcfae", 360, 52, 7.1);
+  paintLayer(h - 105, "#c9e6cb", "#b2dcba", "#86c49f", 330, 42, 13.3);
+  paintLayer(h - 58, "#b6dfbf", "#9ccfaa", "#74b890", 290, 32, 19.7);
 
   /* scattered leaf clusters */
   const lr = mulberry(500);
   for (let i = 0; i < 55; i++) {
     const x = lr() * w;
     const y = h - 12 - lr() * 125;
-    ctx.fillStyle = `rgba(42, 88, 32, ${0.22 + lr() * 0.3})`;
+    ctx.fillStyle = `rgba(110, 180, 140, ${0.18 + lr() * 0.22})`;
     for (let j = 0; j < 3; j++) {
       ctx.beginPath();
       ctx.ellipse(x + (j - 1) * 5, y + lr() * 4, 2.5 + lr() * 3, 4.5 + lr() * 4, lr() * Math.PI, 0, Math.PI * 2);
@@ -292,7 +331,7 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
   }
 
   /* small decorative wildflowers baked into the static grass */
-  const petalCols = [BLUSH, YELLOW, "#ffffff", "#f5c6d0", "#ffd9a6"];
+  const petalCols = [BLUSH, CREAM, "#ffffff", "#f7d3df", "#cfe5f7"];
   for (let i = 0; i < 14; i++) {
     const x = 30 + lr() * (w - 60);
     const y = h - 35 - lr() * 105;
@@ -307,7 +346,7 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
       ctx.ellipse(x + Math.cos(a) * pr, y + Math.sin(a) * pr, 2 + lr() * 2.5, 3 + lr() * 2, a, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.fillStyle = YELLOW;
+    ctx.fillStyle = CREAM;
     ctx.beginPath();
     ctx.arc(x, y, 1.5 + lr(), 0, Math.PI * 2);
     ctx.fill();
@@ -331,7 +370,8 @@ export const DanahSecretGarden: React.FC = () => {
   const sceneRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<HTMLCanvasElement>(null);
   const flowersRef = useRef<Flower[]>(flowers);
-  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerRef = useRef<{ x: number; y: number; vx: number } | null>(null);
+  const pushRef = useRef(new Map<string, { a: number; v: number }>());
   const inViewRef = useRef<boolean>(false);
   const spriteCache = useRef(new Map<string, HTMLCanvasElement>());
   const strokesRef = useRef<Stroke[]>([]);
@@ -388,7 +428,7 @@ export const DanahSecretGarden: React.FC = () => {
     return () => clearInterval(t);
   }, [load]);
 
-  /* scene render loop */
+  /* scene render loop — windy meadow */
   useEffect(() => {
     const canvas = sceneRef.current;
     if (!canvas) return;
@@ -399,10 +439,80 @@ export const DanahSecretGarden: React.FC = () => {
     canvas.height = Math.round(size.h * dpr);
     const bg = buildMeadow(size.w, size.h, dpr);
     spriteCache.current.clear();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    /* meadow flower positioning constants */
     const meadowTop = size.h * 0.12;
     const meadowBot = size.h * 0.82;
+
+    /* wind: waves travel across the meadow, and a slow gust swells every now and then */
+    const gustAt = (t: number) => Math.pow(Math.max(0, Math.sin(t / 6500 - 1)), 2);
+    const windAt = (t: number, x: number) => {
+      if (reduce) return 0;
+      const g = gustAt(t);
+      const waves = Math.sin(t / 2400 - x * 0.0035) * 0.55 + Math.sin(t / 1050 - x * 0.007 + 1.3) * 0.28;
+      return waves * (0.65 + 0.9 * g) + 0.3 * g;
+    };
+
+    /* animated foreground grass */
+    const gr = mulberry(4242);
+    const blades = Array.from({ length: Math.round(size.w / 5) }, () => ({
+      x: gr() * size.w,
+      y: size.h - 4 - gr() * 52,
+      h: 12 + gr() * 22,
+      ph: gr() * 6.28,
+      dark: gr() > 0.5,
+    }));
+    const drawBlades = (t: number) => {
+      for (const dark of [true, false]) {
+        ctx.beginPath();
+        for (const b of blades) {
+          if (b.dark !== dark) continue;
+          const w = windAt(t, b.x) * 0.55 + (reduce ? 0 : Math.sin(t / 500 + b.ph) * 0.06);
+          ctx.moveTo(b.x, b.y);
+          ctx.quadraticCurveTo(b.x + w * b.h * 0.25, b.y - b.h * 0.6, b.x + w * b.h * 0.9, b.y - b.h * (1 - Math.abs(w) * 0.12));
+        }
+        ctx.strokeStyle = dark ? "rgba(112,184,144,0.8)" : "rgba(168,220,186,0.85)";
+        ctx.lineWidth = dark ? 1.6 : 1.3;
+        ctx.stroke();
+      }
+    };
+
+    /* blossom petals carried by the wind */
+    const pr = mulberry(777);
+    const petalCols = ["#f7cddb", "#fbe1e9", "#f2a6bd", "#ffffff"];
+    const fall = Array.from({ length: size.w < 640 ? 9 : 18 }, () => ({
+      x: pr() * size.w,
+      y: pr() * size.h,
+      r: 3 + pr() * 3.2,
+      rot: pr() * 6.28,
+      vr: (pr() - 0.5) * 0.04,
+      sp: 0.15 + pr() * 0.35,
+      ph: pr() * 6.28,
+      col: petalCols[Math.floor(pr() * petalCols.length)],
+      a: 0.6 + pr() * 0.35,
+    }));
+    const drawPetals = (t: number, dt: number) => {
+      for (const p of fall) {
+        const w = windAt(t, p.x);
+        p.x += (0.3 + w * 1.3 + p.sp) * dt;
+        p.y += (0.22 + p.sp * 0.5 + Math.sin(t / 700 + p.ph) * 0.25) * dt;
+        p.rot += (p.vr + w * 0.02) * dt;
+        if (p.x > size.w + 12) { p.x = -12; p.y = Math.random() * size.h * 0.7; }
+        if (p.x < -20) p.x = size.w + 10;
+        if (p.y > size.h + 8) { p.y = -8; p.x = Math.random() * size.w; }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.scale(1, 0.55 + 0.45 * Math.abs(Math.sin(t / 900 + p.ph)));
+        ctx.globalAlpha = p.a;
+        ctx.fillStyle = p.col;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.r, p.r * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    };
 
     const getSprite = (f: Flower, px: number) => {
       const S = Math.max(48, Math.round(px * dpr));
@@ -419,13 +529,18 @@ export const DanahSecretGarden: React.FC = () => {
     };
 
     let raf = 0;
+    let last = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      if (!inViewRef.current) return;
+      if (!inViewRef.current) { last = now; return; }
+      const dt = last ? Math.min(2.5, (now - last) / 16.67) : 1;
+      last = now;
+
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(bg, 0, 0);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineCap = "round";
 
       const items = [...flowersRef.current]
         .sort((a, b) => a.v - b.v)
@@ -449,24 +564,55 @@ export const DanahSecretGarden: React.FC = () => {
             break;
           }
         }
+        /* moving the cursor through the meadow gives nearby flowers a push */
+        if (!reduce && Math.abs(ptr.vx) > 0.5) {
+          for (const it of items) {
+            const dist = Math.hypot(ptr.x - it.x, ptr.y - (it.y - it.px * 0.45));
+            const R = it.px * 0.9;
+            if (dist < R) {
+              const st = pushRef.current.get(it.f.id) ?? { a: 0, v: 0 };
+              st.v += clamp(ptr.vx, -40, 40) * 0.0012 * (1 - dist / R);
+              pushRef.current.set(it.f.id, st);
+            }
+          }
+        }
+        ptr.vx *= 0.85;
       }
 
       for (const { f, px, x, y } of items) {
         let s = 1;
         if (f.t !== undefined) s = easeOutBack(clamp((now - f.t) / 900, 0, 1));
         if (hover === f.id) s *= 1.15;
-        const sway = Math.sin(now / 900 + hashId(f.id)) * 0.035;
-        ctx.fillStyle = "rgba(30, 60, 20, 0.18)";
+
+        let push = 0;
+        const st = pushRef.current.get(f.id);
+        if (st) {
+          st.v += -0.05 * st.a * dt;
+          st.v *= Math.pow(0.9, dt);
+          st.a += st.v * dt;
+          push = st.a;
+          if (Math.abs(st.a) < 0.0005 && Math.abs(st.v) < 0.0005) pushRef.current.delete(f.id);
+        }
+
+        const w = windAt(now, x);
+        const lean = clamp(w * 0.11 + push, -0.45, 0.45); // bends the stem: the top moves more than the base
+        const flutter = reduce ? 0 : Math.sin(now / 240 + hashId(f.id)) * 0.012 * (0.4 + Math.abs(w));
+
+        ctx.fillStyle = "rgba(60, 110, 80, 0.15)";
         ctx.beginPath();
         ctx.ellipse(x, y + 1, px * 0.11 * s, px * 0.035 * s, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.save();
         ctx.translate(x, y);
-        ctx.rotate(sway);
+        ctx.transform(1, 0, -lean, 1, 0, 0);
+        ctx.rotate(lean * 0.35 + flutter);
         ctx.scale(s, s);
         ctx.drawImage(getSprite(f, px), -px / 2, -px * 0.96, px, px);
         ctx.restore();
       }
+
+      drawBlades(now);
+      if (!reduce) drawPetals(now, dt);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -507,7 +653,7 @@ export const DanahSecretGarden: React.FC = () => {
     if (strokesRef.current.length >= 14) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
+    } catch { }
     const [x, y] = padPoint(e);
     curRef.current = { c: color, w: 2.2, p: [x, y] };
     redrawPad();
@@ -529,7 +675,7 @@ export const DanahSecretGarden: React.FC = () => {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
-    } catch {}
+    } catch { }
     const cur = curRef.current;
     if (!cur) return;
     if (cur.p.length < 4) cur.p.push(r1(cur.p[0] + 0.1), r1(cur.p[1] + 0.1));
@@ -719,7 +865,7 @@ export const DanahSecretGarden: React.FC = () => {
       {/* Milky White Wash Overlay (Softens Saturation & Melts with Portfolio) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-white/35 z-1"
+        className="pointer-events-none absolute inset-0 z-1 bg-gradient-to-b from-white/40 via-[#e8f2fb]/45 to-[#f9e8ef]/35"
       />
 
       {/* Soft Gradient Fade from White Contact Section Above */}
@@ -730,7 +876,7 @@ export const DanahSecretGarden: React.FC = () => {
 
       {/* ── Content above the meadow ── */}
       <div className="relative z-10 mx-auto max-w-4xl px-4 pt-16 sm:pt-24 pb-6">
-        
+
         {/* Section Header Matching the Rest of the Portfolio */}
         <div className="text-center space-y-3">
           <span className="gd-pill gd-chip shadow-2xs">
@@ -761,11 +907,10 @@ export const DanahSecretGarden: React.FC = () => {
                 aria-label={p.name}
                 onClick={() => setColor(p.hex)}
                 style={{ backgroundColor: p.hex }}
-                className={`h-7 w-7 rounded-full border border-black/10 transition ${
-                  color === p.hex
-                    ? "scale-110 ring-2 ring-slate-800 ring-offset-2"
-                    : "hover:scale-105"
-                }`}
+                className={`h-7 w-7 rounded-full border border-black/10 transition ${color === p.hex
+                  ? "scale-110 ring-2 ring-slate-800 ring-offset-2"
+                  : "hover:scale-105"
+                  }`}
               />
             ))}
           </div>
@@ -823,24 +968,30 @@ export const DanahSecretGarden: React.FC = () => {
             type="button"
             onClick={validateAndPlant}
             disabled={strokeCount === 0 || validating}
-            className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition hover:brightness-105 active:scale-[0.98] disabled:opacity-35"
+            className="relative mt-3.5 flex w-full items-center justify-center gap-2 overflow-hidden rounded-full border border-[#e0628f]/70 py-2.5 text-[14px] font-medium text-[#4a1230] transition active:translate-y-px disabled:opacity-40"
+            style={{
+              background: "linear-gradient(180deg,#ffc9db 0%,#ff9bbd 48%,#fb7fa9 52%,#ffa8c6 100%)",
+              boxShadow: "inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 8px 16px -6px rgba(244,114,182,.6)",
+              textShadow: "0 1px 0 rgba(255,255,255,.55)",
+            }}
           >
+            <span className="pointer-events-none absolute inset-x-3 top-[3px] h-[44%] rounded-full bg-gradient-to-b from-white/75 to-white/5" />
             {validating ? (
               <>
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <svg className="relative h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span>Checking...</span>
+                <span className="relative">Checking...</span>
               </>
             ) : (
               <>
-                <Sprout className="h-4 w-4" />
-                <span>Plant Wildflower</span>
+                <Sprout className="relative h-4 w-4" />
+                <span className="relative">Plant Wildflower</span>
               </>
             )}
           </button>
-          <p className={`mt-1.5 min-h-[1.25rem] text-center text-xs font-medium transition-colors ${note.startsWith("Beautiful") || note.startsWith("Checking") ? "text-emerald-600" : "text-rose-500"}`}>{note}</p>
+          <p className={`mt-1.5 min-h-[1.25rem] text-center text-xs font-medium transition-colors ${note.startsWith("Beautiful") || note.startsWith("Checking") ? "text-[#4f9a73]" : "text-rose-500"}`}>{note}</p>
         </aside>
       </div>
 
@@ -852,14 +1003,16 @@ export const DanahSecretGarden: React.FC = () => {
           className="absolute inset-0 block w-full"
           onPointerMove={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
-            pointerRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+            const x = e.clientX - r.left;
+            const prev = pointerRef.current;
+            pointerRef.current = { x, y: e.clientY - r.top, vx: prev ? x - prev.x : 0 };
           }}
           onPointerLeave={() => { pointerRef.current = null; }}
         />
 
         {/* flower count badge */}
         <div className="absolute bottom-5 left-5 z-20 gd-pill gd-chip shadow-md">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="h-2 w-2 rounded-full bg-[#8fc3ea]" />
           <span className="font-semibold text-slate-800">{flowers.length} wildflowers blooming</span>
         </div>
       </div>

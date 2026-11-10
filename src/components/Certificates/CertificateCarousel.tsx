@@ -131,48 +131,63 @@ const Paperclip: React.FC<{ className?: string }> = ({ className = "" }) => (
   </svg>
 );
 
-const Details: React.FC<{ cert: Cert; compact?: boolean }> = ({ cert, compact }) => (
-  <div className="flex h-full flex-col justify-between gap-3" style={{ color: "var(--ink)" }}>
-    <div>
-      <h3 className={`font-bold leading-snug tracking-tight ${compact ? "text-lg" : "text-xl"}`}>
-        {cert.title}
-      </h3>
-      <p className="mt-0.5 text-[13px] opacity-70">
-        {cert.issuer} · {cert.date}
-      </p>
+const Details: React.FC<{ cert: Cert; mobile?: boolean }> = ({ cert, mobile }) => {
+  const sm = mobile ? "cf-sm" : "";
+  const icon = mobile ? "h-3 w-3" : "h-3.5 w-3.5";
+  const chips = (
+    <div className={`flex flex-wrap ${mobile ? "gap-1" : "mt-2 gap-1.5"}`}>
+      {cert.skills.map((s) => (
+        <span key={s} className={`cf-pill cf-chip ${sm}`}>
+          <span>{s}</span>
+        </span>
+      ))}
     </div>
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="flex flex-wrap gap-1.5">
-        {cert.skills.map((s) => (
-          <span key={s} className="cf-pill cf-chip">
-            <span>{s}</span>
-          </span>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <a
-          href={href(cert.pdf)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => playUiClick(true)}
-          className="cf-pill cf-pill-pink"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          <span>View PDF</span>
-        </a>
-        <a
-          href={href(cert.pdf)}
-          download
-          onClick={() => playUiClick(true)}
-          className="cf-pill"
-        >
-          <Download className="h-3.5 w-3.5" />
-          <span>Download</span>
-        </a>
-      </div>
+  );
+  const buttons = (
+    <div className={`flex shrink-0 gap-2 ${mobile ? "mt-2.5" : ""}`}>
+      <a
+        href={href(cert.pdf)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => playUiClick(true)}
+        className={`cf-pill cf-pill-pink ${sm}`}
+      >
+        <ExternalLink className={icon} />
+        <span>View PDF</span>
+      </a>
+      <a href={href(cert.pdf)} download onClick={() => playUiClick(true)} className={`cf-pill ${sm}`}>
+        <Download className={icon} />
+        <span>Download</span>
+      </a>
     </div>
-  </div>
-);
+  );
+
+  if (mobile) {
+    return (
+      <div style={{ color: "var(--ink)" }}>
+        <h3 className="text-[15px] font-bold leading-snug tracking-tight">{cert.title}</h3>
+        <p className="mt-0.5 text-[12px] opacity-70">
+          {cert.issuer} · {cert.date}
+        </p>
+        <div className="mt-2">{chips}</div>
+        {buttons}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-end justify-between gap-4" style={{ color: "var(--ink)" }}>
+      <div className="min-w-0">
+        <h3 className="text-[19px] font-bold leading-snug tracking-tight">{cert.title}</h3>
+        <p className="mt-0.5 text-[13px] opacity-70">
+          {cert.issuer} · {cert.date}
+        </p>
+        {chips}
+      </div>
+      {buttons}
+    </div>
+  );
+};
 
 /* ------------------------------------------------------------------ */
 /*  Section                                                            */
@@ -347,6 +362,15 @@ export const CertificateCarousel: React.FC = () => {
         .cf-pill-pink::before { content: ""; position: absolute; z-index: 0; left: 12px; right: 12px; top: 3px; height: 44%; border-radius: 9999px; background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.05)); }
         a.cf-pill:active, button.cf-pill:active { transform: translateY(1px); filter: brightness(.96); }
 
+
+        /* mobile stack tweaks */
+        .cf-tab-m { border: 0; cursor: pointer; z-index: 2; }
+        .cf-tab-m .cf-tab-label { max-width: none; opacity: 1; margin-left: 8px; }
+        .cf-panel-m { box-shadow: 0 -10px 18px -12px rgba(74,51,40,.4), 0 18px 30px -22px rgba(74,51,40,.4), inset 0 1px 0 rgba(255,255,255,.55); }
+        .cf-pill.cf-sm { padding: .3rem .7rem; font-size: 12px; gap: .3rem; }
+        .cf-chip.cf-sm { padding: .12rem .5rem; font-size: 10.5px; }
+        .cf-pill-pink.cf-sm::before { left: 9px; right: 9px; }
+
         @media (prefers-reduced-motion: reduce) {
           [data-reveal].is-in, .is-in .cf-stack > *, .cf-words.is-in .cf-word, .is-open .cf-clipper { animation: none; }
           .cf-stack > * { opacity: 1; } .cf-word { transform: none; }
@@ -410,7 +434,7 @@ export const CertificateCarousel: React.FC = () => {
               return (
                 <div
                   key={cert.id}
-                  className={`cf-folder relative -ml-3 first:ml-0 ${open ? "is-open" : ""}`}
+                  className={`cf-folder relative -ml-5 first:ml-0 ${open ? "is-open" : ""}`}
                   style={{
                     ...vars(i, { "--g": open ? 7 : 1 }),
                     zIndex: open ? 50 : i + 1,
@@ -454,7 +478,7 @@ export const CertificateCarousel: React.FC = () => {
                     </div>
 
                     {/* open face: certificate sliding out of a front pocket */}
-                    <div className="cf-open absolute inset-y-0 left-0 min-w-[540px] w-full">
+                    <div className="cf-open absolute inset-y-0 left-0 flex w-full min-w-[540px] flex-col pt-[28px]">
                       <button
                         type="button"
                         aria-label={`Enlarge ${cert.title}`}
@@ -462,7 +486,7 @@ export const CertificateCarousel: React.FC = () => {
                           playUiClick(true);
                           setZoom(i);
                         }}
-                        className="cf-paper absolute bottom-[37%] left-[6%] right-[6%] top-[30px] cursor-zoom-in rounded-md p-2 outline-none"
+                        className="cf-paper relative mx-[6%] flex min-h-0 flex-1 cursor-zoom-in items-center justify-center rounded-md p-2 outline-none"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -473,8 +497,8 @@ export const CertificateCarousel: React.FC = () => {
                           className="h-full w-full object-contain"
                         />
                       </button>
-                      <Paperclip className="cf-clipper pointer-events-none absolute right-[11%] top-[6px] z-10 w-7 drop-shadow" />
-                      <div className="cf-pocket absolute inset-x-0 bottom-0 h-[38%] rounded-t-[26px] p-5 pt-6">
+                      <Paperclip className="cf-clipper pointer-events-none absolute right-[11%] top-[4px] z-10 w-7 drop-shadow" />
+                      <div className="cf-pocket relative -mt-5 rounded-t-[26px] px-5 pb-4 pt-6">
                         <Details cert={cert} />
                       </div>
                     </div>
@@ -485,42 +509,52 @@ export const CertificateCarousel: React.FC = () => {
           </div>
         </div>
 
-        {/* ===================== MOBILE: folders stacked vertically ===================== */}
+        {/* ===================== MOBILE: tabbed folders stacked vertically ===================== */}
         <div data-reveal className="lg:hidden">
-          <div className="cf-stack flex flex-col gap-9 pt-6">
+          <div className="cf-stack flex flex-col pt-8">
             {CERTS.map((cert, i) => {
               const open = openIdx === i;
+              const last = i === CERTS.length - 1;
+              const p = [4, 50, 96][i % 3]; // tabs sit at different spots, like real dividers
+              const toggle = () => (open ? setOpenIdx(-1) : openFolder(i));
               return (
-                <div key={cert.id} className={`relative ${open ? "is-open" : ""}`} style={vars(i)}>
-                  <div className="cf-tab" style={{ top: -26, height: 28 }}>
+                <div
+                  key={cert.id}
+                  className={`relative ${open ? "is-open" : ""} ${i > 0 ? "-mt-[30px]" : ""}`}
+                  style={{ ...vars(i), zIndex: i + 1 }}
+                >
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    aria-expanded={open}
+                    aria-label={`${open ? "Close" : "Open"} ${cert.title}`}
+                    className="cf-tab cf-tab-m"
+                    style={{ left: `${p}%`, transform: `translateX(-${p}%)`, top: -26, height: 28 }}
+                  >
                     <span>{num(i)}</span>
                     <span className="cf-tab-label">{cert.tab}</span>
-                  </div>
-                  <div className="cf-panel relative overflow-hidden rounded-[20px]">
+                  </button>
+
+                  <div className={`cf-panel cf-panel-m relative overflow-hidden rounded-[22px] ${last ? "pb-4" : "pb-[34px]"}`}>
                     <button
                       type="button"
-                      aria-expanded={open}
-                      onClick={() => (open ? setOpenIdx(-1) : openFolder(i))}
-                      className="relative z-10 flex w-full items-center gap-3 p-3.5 text-left outline-none"
+                      onClick={toggle}
+                      tabIndex={-1}
+                      aria-hidden
+                      className="relative z-10 flex h-10 w-full items-center justify-between gap-3 px-4 text-left outline-none"
                     >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 font-mono text-[11px] font-bold shadow-sm" style={{ color: "var(--ink)" }}>
-                        {num(i)}
+                      <span className="truncate text-[11.5px] font-medium opacity-70" style={{ color: "var(--ink)" }}>
+                        {cert.issuer}
                       </span>
-                      <span className="cf-sticker rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wide">
-                        {cert.tab}
-                      </span>
-                      <span className="ml-auto font-mono text-[11px] font-semibold opacity-60" style={{ color: "var(--ink)" }}>
+                      <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-semibold opacity-70" style={{ color: "var(--ink)" }}>
                         {cert.date}
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
                       </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
-                        style={{ color: "var(--ink)" }}
-                      />
                     </button>
 
                     <div className="cf-reveal relative z-10">
                       <div className="overflow-hidden">
-                        <div className="px-3.5 pb-3.5">
+                        <div className="relative px-3 pb-1">
                           <button
                             type="button"
                             aria-label={`Enlarge ${cert.title}`}
@@ -528,8 +562,7 @@ export const CertificateCarousel: React.FC = () => {
                               playUiClick(true);
                               setZoom(i);
                             }}
-                            className="cf-paper relative block w-full rounded-md p-1.5"
-                            style={{ transform: open ? "rotate(-.5deg)" : undefined }}
+                            className="cf-paper block w-full rounded-md p-1.5"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -540,9 +573,9 @@ export const CertificateCarousel: React.FC = () => {
                               className="block h-auto max-h-[60vh] w-full object-contain"
                             />
                           </button>
-                          <Paperclip className="pointer-events-none absolute right-6 top-2 z-10 w-6 drop-shadow" />
-                          <div className="cf-pocket mt-3 rounded-2xl p-4" style={{ transform: "none" }}>
-                            <Details cert={cert} compact />
+                          <Paperclip className="pointer-events-none absolute right-6 -top-1 z-10 w-5 drop-shadow" />
+                          <div className="cf-pocket mt-2.5 rounded-2xl p-3.5">
+                            <Details cert={cert} mobile />
                           </div>
                         </div>
                       </div>

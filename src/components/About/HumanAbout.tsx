@@ -294,7 +294,7 @@ export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
         ))}
       </div>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-24 pt-24 sm:pt-32">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-16 sm:pt-20">
         {/* ------------------------- Chapter 1: about me ------------------------- */}
         <div className="space-y-4">
           <span data-reveal className="ha-pill" style={v(0)}>
@@ -381,7 +381,7 @@ export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
         </div>
 
         {/* strap that grows as you scroll to the next chapter */}
-        <div className="mx-auto my-12 flex h-40 w-[22px] flex-col items-center sm:my-16">
+        <div className="mx-auto my-6 flex h-28 w-[22px] flex-col items-center sm:my-8">
           <div
             data-grow
             className="h-full w-full origin-top rounded-b-full"
