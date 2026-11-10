@@ -16,7 +16,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import { RotateCcw, Sprout, Undo2 } from "lucide-react";
-import { playPlantChime, playUiClick } from "@/utils/sound";
+import { playPlantChime } from "@/utils/sound";
 
 /* ───────────────────────── types & palette ───────────────────────── */
 
@@ -358,7 +358,11 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
 
 /* ───────────────────────── component ───────────────────────── */
 
-export const DanahSecretGarden: React.FC = () => {
+interface DanahSecretGardenProps {
+  inWindow?: boolean;
+}
+
+export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow = false }) => {
   const [flowers, setFlowers] = useState<Flower[]>(makeSeeds);
   const [size, setSize] = useState({ w: 900, h: 300 });
   const [color, setColor] = useState<string>(BLUSH);
@@ -387,7 +391,7 @@ export const DanahSecretGarden: React.FC = () => {
     const ro = new ResizeObserver(([e]) => {
       const w = Math.round(e.contentRect.width);
       if (w > 0) {
-        const mh = w < 640 ? 230 : w < 1024 ? 270 : 310;
+        const mh = inWindow ? (w < 640 ? 140 : 170) : (w < 640 ? 230 : w < 1024 ? 270 : 310);
         setSize({ w, h: mh });
       }
     });
@@ -686,7 +690,6 @@ export const DanahSecretGarden: React.FC = () => {
   };
 
   const undo = () => {
-    playUiClick(true);
     strokesRef.current.pop();
     setStrokeCount(strokesRef.current.length);
     redrawPad();
@@ -803,6 +806,202 @@ export const DanahSecretGarden: React.FC = () => {
   };
 
   const handleSurprise = () => plant(makeFlower(Math.floor(Math.random() * 1e9)));
+
+  if (inWindow) {
+    return (
+      <div className="relative w-full select-none overflow-hidden rounded-[20px] bg-gradient-to-b from-[#eef6fc] via-[#fceef3] to-[#e8f7ee] border border-pink-100/60 shadow-inner flex flex-col justify-between mt-3 min-h-[500px]">
+        <style>{`
+          @keyframes garden-drift {
+            0% { transform: scale(1.02) translate3d(0, 0, 0); }
+            50% { transform: scale(1.06) translate3d(-1%, -1.2%, 0); }
+            100% { transform: scale(1.02) translate3d(0, 0, 0); }
+          }
+          .garden-bg-anim {
+            animation: garden-drift 28s ease-in-out infinite alternate;
+            will-change: transform;
+            filter: saturate(0.78) brightness(1.06);
+            opacity: 0.68;
+          }
+          .gd-pill {
+            position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .45rem;
+            border-radius: 9999px; border: 1px solid rgba(148,163,184,.45); padding: .35rem .85rem;
+            font-size: 12.5px; font-weight: 500; color: #334155; white-space: nowrap;
+            background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(245,245,248,0.85));
+            box-shadow: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(15,23,42,.05), 0 4px 10px -6px rgba(15,23,42,.2);
+          }
+          .gd-chip { padding: .2rem .65rem; font-size: 11px; }
+          .gd-grad {
+            background: linear-gradient(135deg, #0b0b10 10%, #4a1236 50%, #f0568f 100%);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+          }
+          .garden-glass {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 245, 250, 0.88));
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
+            backdrop-filter: blur(24px) saturate(1.4);
+            border: 1px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 0 1px rgba(255, 180, 200, 0.2), 0 20px 40px -12px rgba(130, 40, 70, 0.15);
+          }
+        `}</style>
+
+        {/* Floating Animated Cloud Background Layer */}
+        <div
+          aria-hidden
+          className="garden-bg-anim pointer-events-none absolute inset-[-3%] bg-cover bg-center"
+          style={{
+            backgroundImage: "url('/assets/images/stickers/garden-background2.png')",
+          }}
+        />
+
+        {/* Milky Wash Overlay */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-1 bg-gradient-to-b from-white/40 via-[#e8f2fb]/45 to-[#f9e8ef]/35"
+        />
+
+        {/* Content area: Header & Easel */}
+        <div className="relative z-10 w-full pt-3 px-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+                Danah&apos;s <span className="gd-grad">Secret Garden</span>
+              </h3>
+              <p className="text-xs text-slate-600">
+                Draw a flower, our AI validates your bloom, and it plants into our shared meadow.
+              </p>
+            </div>
+            <div className="gd-pill gd-chip shadow-xs">
+              <span className="h-2 w-2 rounded-full bg-[#8fc3ea]" />
+              <span className="font-semibold text-slate-800">{flowers.length} wildflowers blooming</span>
+            </div>
+          </div>
+
+          {/* Frosted Glass Drawing Card */}
+          <aside className="garden-glass mx-auto my-3 w-full max-w-[270px] sm:max-w-[290px] rounded-2xl p-3.5 sm:p-4">
+            <h4 className="text-center text-xs font-semibold tracking-tight text-slate-800">
+              Draw a flower, plant it below
+            </h4>
+
+            {/* palette */}
+            <div className="mt-2 flex items-center justify-center gap-2">
+              {PAINT.map((p) => (
+                <button
+                  key={p.hex}
+                  type="button"
+                  title={p.name}
+                  aria-label={p.name}
+                  onClick={() => setColor(p.hex)}
+                  style={{ backgroundColor: p.hex }}
+                  className={`h-6 w-6 rounded-full border border-black/10 transition ${
+                    color === p.hex
+                      ? "scale-110 ring-2 ring-slate-800 ring-offset-2"
+                      : "hover:scale-105"
+                  }`}
+                />
+              ))}
+            </div>
+
+            {/* drawing canvas — strictly 1:1 square internal resolution */}
+            <div className="relative mt-2.5 aspect-square w-full touch-none rounded-xl border border-slate-200/90 bg-white/95 shadow-inner overflow-hidden">
+              {strokeCount === 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-medium text-slate-400">
+                  draw a flower, then a stem and a leaf
+                </div>
+              )}
+              <canvas
+                ref={padRef}
+                width={520}
+                height={520}
+                className="absolute inset-0 h-full w-full cursor-crosshair rounded-xl touch-none"
+                onPointerDown={onDown}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={onUp}
+              />
+            </div>
+
+            {/* controls */}
+            <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-500">
+              <button
+                type="button"
+                onClick={undo}
+                disabled={strokeCount === 0}
+                className="flex items-center gap-1 hover:text-slate-800 transition disabled:opacity-30"
+              >
+                <Undo2 className="h-3 w-3" />
+                <span>undo</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSurprise}
+                className="text-pink-600 hover:text-pink-700 font-semibold transition text-xs"
+              >
+                surprise me
+              </button>
+              <button
+                type="button"
+                onClick={clearPad}
+                disabled={strokeCount === 0}
+                className="flex items-center gap-1 hover:text-slate-800 transition disabled:opacity-30"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>clear</span>
+              </button>
+            </div>
+
+            {/* AI plant button */}
+            <button
+              type="button"
+              onClick={validateAndPlant}
+              disabled={strokeCount === 0 || validating}
+              className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-[#e0628f]/70 py-2 text-[13px] font-medium text-[#4a1230] transition active:translate-y-px disabled:opacity-40"
+              style={{
+                background: "linear-gradient(180deg,#ffc9db 0%,#ff9bbd 48%,#fb7fa9 52%,#ffa8c6 100%)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 6px 14px -5px rgba(244,114,182,.6)",
+                textShadow: "0 1px 0 rgba(255,255,255,.55)",
+              }}
+            >
+              <span className="pointer-events-none absolute inset-x-3 top-[2px] h-[44%] rounded-full bg-gradient-to-b from-white/75 to-white/5" />
+              {validating ? (
+                <>
+                  <svg className="relative h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="relative">Checking...</span>
+                </>
+              ) : (
+                <>
+                  <Sprout className="relative h-3.5 w-3.5" />
+                  <span className="relative">Plant Wildflower</span>
+                </>
+              )}
+            </button>
+            <p className={`mt-1 min-h-[1rem] text-center text-[11px] font-medium transition-colors ${
+              note.startsWith("Beautiful") || note.startsWith("Checking") ? "text-[#4f9a73]" : "text-rose-500"
+            }`}>
+              {note}
+            </p>
+          </aside>
+        </div>
+
+        {/* Meadow canvas at the bottom */}
+        <div ref={wrapRef} className="relative z-10 w-full mt-auto" style={{ height: size.h }}>
+          <canvas
+            ref={sceneRef}
+            style={{ width: size.w, height: size.h }}
+            className="absolute inset-0 block w-full"
+            onPointerMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - r.left;
+              const prev = pointerRef.current;
+              pointerRef.current = { x, y: e.clientY - r.top, vx: prev ? x - prev.x : 0 };
+            }}
+            onPointerLeave={() => { pointerRef.current = null; }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <footer
@@ -954,7 +1153,7 @@ export const DanahSecretGarden: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { playUiClick(true); clearPad(); }}
+              onClick={clearPad}
               disabled={strokeCount === 0}
               className="flex items-center gap-1 hover:text-slate-800 transition disabled:opacity-30"
             >
@@ -1024,3 +1223,5 @@ export const DanahSecretGarden: React.FC = () => {
     </footer>
   );
 };
+
+export const SecretGardenInWindow: React.FC = () => <DanahSecretGarden inWindow />;

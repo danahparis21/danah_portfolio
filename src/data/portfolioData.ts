@@ -267,6 +267,30 @@ export const PORTFOLIO_DATA = {
         accentColor: "text-rose-600",
       },
     },
+    {
+      id: "secret-garden",
+      projectNumber: "PROJECT 05",
+      title: "Secret Garden",
+      subtitle: "Interactive Botanical Drawing Canvas & Community Meadow",
+      badge: "Creative Tech & Meadow",
+      period: "2026",
+      role: "Creator & Creative Developer",
+      description:
+        "An interactive, collaborative drawing canvas where visitors sketch blooms in pastel gouache. Every planted flower blossoms in real-time across a shared meadow with generative canvas physics and live cloud persistence.",
+      bullets: [
+        "Engineered smooth 60fps canvas drawing engine with synchronized coordinates and touch support.",
+        "Created procedural botanical generation and whimsical particle confetti physics.",
+        "Integrated multi-visitor cloud persistence via Upstash Redis REST API.",
+      ],
+      metrics: [],
+      tags: ["HTML5 Canvas", "Creative Tech", "Interactive Art", "Upstash Redis", "Confetti FX"],
+      colorTheme: {
+        tabBg: "bg-pink-500",
+        cardBg: "bg-[#fff5f7]",
+        textColor: "text-slate-900",
+        accentColor: "text-pink-600",
+      },
+    },
   ] as Project[],
 
   achievements: [

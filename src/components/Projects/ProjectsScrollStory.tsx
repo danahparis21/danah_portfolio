@@ -11,10 +11,11 @@ import {
   ChevronRight,
   Globe,
   FolderOpen,
+  Flower2,
 } from "lucide-react";
 import { GithubIcon } from "@/components/UI/Icons";
 import { PORTFOLIO_DATA, Project } from "@/data/portfolioData";
-import { playUiClick } from "@/utils/sound";
+import { SecretGardenInWindow } from "@/components/Garden/DanahSecretGarden";
 
 /* ------------------------------------------------------------------ */
 /*  Config                                                             */
@@ -83,6 +84,7 @@ export const ProjectsScrollStory: React.FC = () => {
   const hasPhone = currentProject.id in MOBILE_DEMOS;
   const phoneSrc = MOBILE_DEMOS[currentProject.id];
   const metrics = currentProject.metrics ?? [];
+  const isSecretGarden = currentProject.id === "secret-garden";
 
   // Reset video playback states on project switch
   useEffect(() => {
@@ -100,9 +102,21 @@ export const ProjectsScrollStory: React.FC = () => {
     }
   }, [activeIdx]);
 
+  // Listen for open-project-tab event from navigation or hero folders
+  useEffect(() => {
+    const handleOpenTab = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        const idx = projects.findIndex((p) => p.id === customEvent.detail);
+        if (idx !== -1) setActiveIdx(idx);
+      }
+    };
+    window.addEventListener("open-project-tab", handleOpenTab);
+    return () => window.removeEventListener("open-project-tab", handleOpenTab);
+  }, [projects]);
+
   // Handle play/pause toggle
   const togglePlay = () => {
-    playUiClick(true);
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
@@ -118,7 +132,6 @@ export const ProjectsScrollStory: React.FC = () => {
 
   // Handle mute/unmute toggle
   const toggleMute = () => {
-    playUiClick(true);
     const v = videoRef.current;
     if (!v) return;
     v.muted = !muted;
@@ -127,11 +140,10 @@ export const ProjectsScrollStory: React.FC = () => {
 
   const goTo = (i: number) => {
     if (i < 0 || i >= projects.length || i === activeIdx) return;
-    playUiClick(true);
     setActiveIdx(i);
   };
 
-  // High-performance wheel scroll controller on the Projects window
+  // Smooth wheel scroll controller on the Projects window
   // Allows cycling through all projects with fluid trackpad or mouse wheel strokes,
   // pausing on any project, and scrolling naturally past the first or last project!
   const lastWheelTime = useRef(0);
@@ -140,11 +152,9 @@ export const ProjectsScrollStory: React.FC = () => {
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      // Ignore tiny jitter
       if (Math.abs(e.deltaY) < 18) return;
 
       const now = Date.now();
-      // 360ms cooldown prevents accidental rapid skipping
       if (now - lastWheelTime.current < 360) return;
 
       if (e.deltaY > 0) {
@@ -152,19 +162,15 @@ export const ProjectsScrollStory: React.FC = () => {
         if (activeIdx < projects.length - 1) {
           e.preventDefault();
           lastWheelTime.current = now;
-          playUiClick(true);
           setActiveIdx((prev) => prev + 1);
         }
-        // At last project (activeIdx === 3), do not preventDefault -> page scrolls down to About
       } else {
         // Scrolling UP
         if (activeIdx > 0) {
           e.preventDefault();
           lastWheelTime.current = now;
-          playUiClick(true);
           setActiveIdx((prev) => prev - 1);
         }
-        // At first project (activeIdx === 0), do not preventDefault -> page scrolls up to Hero
       }
     };
 
@@ -184,10 +190,8 @@ export const ProjectsScrollStory: React.FC = () => {
     if (Math.abs(deltaY) < 45) return;
 
     if (deltaY > 0 && activeIdx < projects.length - 1) {
-      playUiClick(true);
       setActiveIdx((prev) => prev + 1);
     } else if (deltaY < 0 && activeIdx > 0) {
-      playUiClick(true);
       setActiveIdx((prev) => prev - 1);
     }
   };
@@ -323,7 +327,8 @@ export const ProjectsScrollStory: React.FC = () => {
         <div className="absolute right-[4%] top-[75%] h-[340px] w-[340px] rounded-full bg-[#ffe3cc] opacity-35 blur-3xl" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-4">
+      {/* Main Container — Uniform max-w-6xl matching About Me section */}
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4">
 
         {/* Section Header */}
         <div className="mb-5 sm:mb-6 flex flex-wrap items-baseline justify-between gap-3 px-1">
@@ -384,7 +389,15 @@ export const ProjectsScrollStory: React.FC = () => {
                             : "text-slate-600 hover:bg-white/45"
                         }`}
                       >
-                        <FolderIcon className="h-4 w-5 shrink-0" />
+                        {p.id === "secret-garden" ? (
+                          <Flower2
+                            className={`h-4 w-4 shrink-0 transition-colors ${
+                              i === activeIdx ? "text-pink-600 fill-pink-200" : "text-pink-400 fill-pink-100"
+                            }`}
+                          />
+                        ) : (
+                          <FolderIcon className="h-4 w-5 shrink-0" />
+                        )}
                         <span className="truncate">{p.title}</span>
                       </button>
                     </li>
@@ -420,7 +433,6 @@ export const ProjectsScrollStory: React.FC = () => {
                           href={l.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={() => playUiClick(true)}
                           className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[12.5px] font-medium text-slate-600 transition hover:bg-white/50"
                         >
                           <GithubIcon className="h-3.5 w-3.5 shrink-0" />
@@ -439,7 +451,6 @@ export const ProjectsScrollStory: React.FC = () => {
                   href="https://github.com/danahparis21"
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => playUiClick(true)}
                   className="flex items-center gap-2 rounded-xl px-2 py-1.5 text-[12.5px] font-medium text-pink-600 transition hover:bg-pink-50/60"
                 >
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" />
@@ -478,7 +489,9 @@ export const ProjectsScrollStory: React.FC = () => {
                   </button>
                 </div>
 
-                <span className="text-[15px] sm:text-[16px] font-semibold text-slate-800">Projects</span>
+                <span className="text-[15px] sm:text-[16px] font-semibold text-slate-800">
+                  {isSecretGarden ? "Secret Garden" : "Projects"}
+                </span>
 
                 {/* Step Progress Dots */}
                 <div className="hidden sm:flex items-center gap-1.5 ml-2">
@@ -516,191 +529,199 @@ export const ProjectsScrollStory: React.FC = () => {
                         : "text-slate-600 hover:bg-white/40"
                     }`}
                   >
-                    <FolderIcon className="h-3.5 w-4 shrink-0" />
+                    {p.id === "secret-garden" ? (
+                      <Flower2 className="h-3.5 w-3.5 text-pink-500 fill-pink-200" />
+                    ) : (
+                      <FolderIcon className="h-3.5 w-4 shrink-0" />
+                    )}
                     <span>{p.title}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Project Content Stage */}
-              <div className="pj-switch-content">
-                
-                {/* Title row */}
-                <div className="pj-fade mt-4 sm:mt-5 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-                      {currentProject.title}
-                    </h3>
-                    <p className="mt-1 text-[13.5px] sm:text-[14.5px] text-slate-500">{currentProject.subtitle}</p>
-                    <p className="mt-1 text-xs text-slate-400 lg:hidden">
-                      {currentProject.period} · {currentProject.role}
-                    </p>
+              {/* Dynamic Project Content */}
+              {isSecretGarden ? (
+                /* ── Full Secret Garden Living Experience (no detail floating boxes) ── */
+                <SecretGardenInWindow />
+              ) : (
+                /* ── Standard Project Stage: Centered Laptop & Details ── */
+                <div className="pj-switch-content">
+                  
+                  {/* Title row */}
+                  <div className="pj-fade mt-4 sm:mt-5 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+                        {currentProject.title}
+                      </h3>
+                      <p className="mt-1 text-[13.5px] sm:text-[14.5px] text-slate-500">{currentProject.subtitle}</p>
+                      <p className="mt-1 text-xs text-slate-400 lg:hidden">
+                        {currentProject.period} · {currentProject.role}
+                      </p>
+                    </div>
+                    {currentProject.liveUrl && (
+                      <a
+                        href={currentProject.liveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pj-pill pj-pill-pink"
+                      >
+                        <Globe className="h-3.5 w-3.5" />
+                        <span>Live Platform</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
                   </div>
-                  {currentProject.liveUrl && (
-                    <a
-                      href={currentProject.liveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => playUiClick(true)}
-                      className="pj-pill pj-pill-pink"
-                    >
-                      <Globe className="h-3.5 w-3.5" />
-                      <span>Live Platform</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
 
-                {/* Device Stage — Centered & Balanced */}
-                <div className="mt-5 flex flex-col items-center justify-center gap-6 lg:flex-row lg:items-center lg:gap-8">
-                  {metrics.length > 0 && (
-                    <div className="order-2 grid w-full grid-cols-2 gap-2.5 sm:grid-cols-4 lg:order-1 lg:w-[210px] xl:w-[220px] lg:shrink-0 lg:grid-cols-2">
-                      {metrics.map((m, i) => (
-                        <div
-                          key={m.label}
-                          className={`pj-tile flex flex-col justify-center ${
-                            metrics.length === 3 && i === 2 ? "col-span-2 lg:col-span-2" : ""
-                          }`}
-                          style={{ "--i": i } as React.CSSProperties}
-                        >
-                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
-                            {m.label}
+                  {/* Device Stage — Centered & Balanced */}
+                  <div className="mt-5 flex flex-col items-center justify-center gap-6 lg:flex-row lg:items-center lg:gap-8">
+                    {metrics.length > 0 && (
+                      <div className="order-2 grid w-full grid-cols-2 gap-2.5 sm:grid-cols-4 lg:order-1 lg:w-[210px] xl:w-[220px] lg:shrink-0 lg:grid-cols-2">
+                        {metrics.map((m, i) => (
+                          <div
+                            key={m.label}
+                            className={`pj-tile flex flex-col justify-center ${
+                              metrics.length === 3 && i === 2 ? "col-span-2 lg:col-span-2" : ""
+                            }`}
+                            style={{ "--i": i } as React.CSSProperties}
+                          >
+                            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                              {m.label}
+                            </div>
+                            <div className="mt-0.5 text-[12.5px] sm:text-[13.5px] font-bold tracking-tight text-slate-800 leading-snug break-words">
+                              {m.value}
+                            </div>
                           </div>
-                          <div className="mt-0.5 text-[12.5px] sm:text-[13.5px] font-bold tracking-tight text-slate-800 leading-snug break-words">
-                            {m.value}
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Centered Laptop Device */}
+                    <div className="relative order-1 w-full max-w-[430px] shrink-0 lg:order-2">
+                      <div className="pj-laptop group relative">
+                        <div className="rounded-[16px] bg-[#16161a] p-[8px] sm:p-[9px] shadow-[0_26px_46px_-18px_rgba(15,23,42,.55)] ring-1 ring-black/40">
+                          <div className="relative aspect-[16/10] overflow-hidden rounded-[8px] bg-slate-950">
+                            <span className="absolute left-1/2 top-[5px] z-10 h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-slate-700" />
+                            {currentProject.videoUrl ? (
+                              <>
+                                <video
+                                  ref={videoRef}
+                                  src={currentProject.videoUrl}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  className="h-full w-full object-cover"
+                                />
+                                <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/45 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <button
+                                    type="button"
+                                    onClick={togglePlay}
+                                    aria-label={playing ? "Pause demo" : "Play demo"}
+                                    className="pj-ctl"
+                                  >
+                                    {playing ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={toggleMute}
+                                    aria-label={muted ? "Unmute demo" : "Mute demo"}
+                                    className="pj-ctl"
+                                  >
+                                    {muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-pink-50 via-white to-violet-50 p-5 text-center">
+                                <div className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
+                                  {currentProject.title}
+                                </div>
+                                <p className="mt-0.5 max-w-[240px] text-[11px] text-slate-500">
+                                  {currentProject.tags.slice(0, 3).join(" • ")}
+                                </p>
+                              </div>
+                            )}
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
                           </div>
                         </div>
+                        {/* Laptop Base */}
+                        <div className="-mx-[6%] h-[12px] sm:h-[13px] rounded-b-[13px] rounded-t-[2px] bg-gradient-to-b from-[#eceef2] via-[#cfd3da] to-[#aab0ba] shadow-[0_12px_18px_-8px_rgba(15,23,42,.4)]">
+                          <div className="mx-auto h-[4px] w-[16%] rounded-b-md bg-[#9aa0ab]" />
+                        </div>
+                      </div>
+
+                      {/* Phone Demo (if available) */}
+                      {hasPhone && (
+                        <div className="absolute -bottom-3 -right-2 z-20 w-[24%] min-w-[88px] sm:-right-4 sm:-bottom-4">
+                          <div className="pj-phone rounded-[1.8rem] bg-[#0d0d10] p-[4px] shadow-[0_24px_38px_-14px_rgba(15,23,42,.6)] ring-1 ring-white/20">
+                            <div className="relative aspect-[9/19.5] overflow-hidden rounded-[1.55rem] bg-slate-950">
+                              <span className="absolute left-1/2 top-[5px] z-10 h-[7px] w-[34%] -translate-x-1/2 rounded-full bg-black" />
+                              {phoneSrc ? (
+                                <video
+                                  ref={phoneRef}
+                                  src={phoneSrc}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-pink-100 via-white to-violet-100 px-1.5 text-center">
+                                  <span className="text-[11px] sm:text-xs font-extrabold tracking-tight text-slate-900">
+                                    {currentProject.title}
+                                  </span>
+                                  <span className="text-[7.5px] leading-tight text-slate-500">
+                                    Mobile Demo
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description + Tech Stack */}
+                  <div className="pj-fade mt-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div className="group/desc relative max-w-md lg:max-w-lg">
+                      <div className="pj-desc max-h-[64px] sm:max-h-[72px] overflow-y-auto pr-2 text-[13.5px] leading-relaxed text-slate-600 transition-[max-height] duration-300 ease-in-out hover:max-h-[160px]">
+                        <p>{currentProject.description}</p>
+                      </div>
+                      <div className="mt-1 text-[11px] font-medium text-pink-500/80">
+                        <span>Hover or scroll for full description</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 md:max-w-sm md:justify-end">
+                      {currentProject.tags.map((tag) => (
+                        <span key={tag} className="pj-pill pj-chip">
+                          <span>{tag}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Repo links on small screens (sidebar is hidden there) */}
+                  {repoLinks.length > 0 && (
+                    <div className="mt-3.5 flex flex-wrap gap-1.5 lg:hidden">
+                      {repoLinks.map((l) => (
+                        <a
+                          key={l.label}
+                          href={l.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pj-pill text-xs py-1 px-2.5"
+                        >
+                          <GithubIcon className="h-3 w-3" />
+                          <span>{l.label}</span>
+                        </a>
                       ))}
                     </div>
                   )}
 
-                  {/* Centered Laptop Device */}
-                  <div className="relative order-1 w-full max-w-[430px] shrink-0 lg:order-2">
-                    <div className="pj-laptop group relative">
-                      <div className="rounded-[16px] bg-[#16161a] p-[8px] sm:p-[9px] shadow-[0_26px_46px_-18px_rgba(15,23,42,.55)] ring-1 ring-black/40">
-                        <div className="relative aspect-[16/10] overflow-hidden rounded-[8px] bg-slate-950">
-                          <span className="absolute left-1/2 top-[5px] z-10 h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-slate-700" />
-                          {currentProject.videoUrl ? (
-                            <>
-                              <video
-                                ref={videoRef}
-                                src={currentProject.videoUrl}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                className="h-full w-full object-cover"
-                              />
-                              <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/45 to-transparent p-2.5 opacity-0 transition-opacity group-hover:opacity-100">
-                                <button
-                                  type="button"
-                                  onClick={togglePlay}
-                                  aria-label={playing ? "Pause demo" : "Play demo"}
-                                  className="pj-ctl"
-                                >
-                                  {playing ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={toggleMute}
-                                  aria-label={muted ? "Unmute demo" : "Mute demo"}
-                                  className="pj-ctl"
-                                >
-                                  {muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-pink-50 via-white to-violet-50 p-5 text-center">
-                              <div className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
-                                {currentProject.title}
-                              </div>
-                              <p className="mt-0.5 max-w-[240px] text-[11px] text-slate-500">
-                                {currentProject.tags.slice(0, 3).join(" • ")}
-                              </p>
-                            </div>
-                          )}
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
-                        </div>
-                      </div>
-                      {/* Laptop Base */}
-                      <div className="-mx-[6%] h-[12px] sm:h-[13px] rounded-b-[13px] rounded-t-[2px] bg-gradient-to-b from-[#eceef2] via-[#cfd3da] to-[#aab0ba] shadow-[0_12px_18px_-8px_rgba(15,23,42,.4)]">
-                        <div className="mx-auto h-[4px] w-[16%] rounded-b-md bg-[#9aa0ab]" />
-                      </div>
-                    </div>
-
-                    {/* Phone Demo (if available) */}
-                    {hasPhone && (
-                      <div className="absolute -bottom-3 -right-2 z-20 w-[24%] min-w-[88px] sm:-right-4 sm:-bottom-4">
-                        <div className="pj-phone rounded-[1.8rem] bg-[#0d0d10] p-[4px] shadow-[0_24px_38px_-14px_rgba(15,23,42,.6)] ring-1 ring-white/20">
-                          <div className="relative aspect-[9/19.5] overflow-hidden rounded-[1.55rem] bg-slate-950">
-                            <span className="absolute left-1/2 top-[5px] z-10 h-[7px] w-[34%] -translate-x-1/2 rounded-full bg-black" />
-                            {phoneSrc ? (
-                              <video
-                                ref={phoneRef}
-                                src={phoneSrc}
-                                autoPlay
-                                loop
-                                muted
-                                playsInline
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-pink-100 via-white to-violet-100 px-1.5 text-center">
-                                <span className="text-[11px] sm:text-xs font-extrabold tracking-tight text-slate-900">
-                                  {currentProject.title}
-                                </span>
-                                <span className="text-[7.5px] leading-tight text-slate-500">
-                                  Mobile Demo
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
-
-                {/* Description + Tech Stack */}
-                <div className="pj-fade mt-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                  <div className="group/desc relative max-w-md lg:max-w-lg">
-                    <div className="pj-desc max-h-[64px] sm:max-h-[72px] overflow-y-auto pr-2 text-[13.5px] leading-relaxed text-slate-600 transition-[max-height] duration-300 ease-in-out hover:max-h-[160px]">
-                      <p>{currentProject.description}</p>
-                    </div>
-                    <div className="mt-1 text-[11px] font-medium text-pink-500/80">
-                      <span>Hover or scroll for full description</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 md:max-w-sm md:justify-end">
-                    {currentProject.tags.map((tag) => (
-                      <span key={tag} className="pj-pill pj-chip">
-                        <span>{tag}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Repo links on small screens (sidebar is hidden there) */}
-                {repoLinks.length > 0 && (
-                  <div className="mt-3.5 flex flex-wrap gap-1.5 lg:hidden">
-                    {repoLinks.map((l) => (
-                      <a
-                        key={l.label}
-                        href={l.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => playUiClick(true)}
-                        className="pj-pill text-xs py-1 px-2.5"
-                      >
-                        <GithubIcon className="h-3 w-3" />
-                        <span>{l.label}</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-
-              </div>
+              )}
             </div>
 
           </article>

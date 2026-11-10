@@ -9,7 +9,6 @@ import { ProjectsScrollStory } from "@/components/Projects/ProjectsScrollStory";
 import { AchievementTheater } from "@/components/Achievements/AchievementTheater";
 import { CertificateCarousel } from "@/components/Certificates/CertificateCarousel";
 import { ContactNumpad } from "@/components/Contact/ContactNumpad";
-import { DanahSecretGarden } from "@/components/Garden/DanahSecretGarden";
 import { RecruiterResumeView } from "@/components/RecruiterMode/RecruiterResumeView";
 import { playUiClick } from "@/utils/sound";
 
@@ -30,6 +29,14 @@ export default function Home() {
 
   const scrollToSection = (sectionId: string) => {
     playUiClick(soundEnabled);
+    if (sectionId === "garden") {
+      const elem = document.getElementById("projects");
+      if (elem) {
+        elem.scrollIntoView({ behavior: "smooth" });
+        window.dispatchEvent(new CustomEvent("open-project-tab", { detail: "secret-garden" }));
+      }
+      return;
+    }
     const elem = document.getElementById(sectionId);
     if (elem) {
       elem.scrollIntoView({ behavior: "smooth" });
@@ -69,6 +76,7 @@ export default function Home() {
           {/* Chapter 1: Hero Section */}
           <HeroStationery
             onScrollDown={() => scrollToSection("about")}
+            onFolderClick={scrollToSection}
           />
 
           {/* Chapter 2: Scroll-Driven Stacking Projects in Shades of Pink (MacBook Windows) */}
@@ -88,8 +96,10 @@ export default function Home() {
           {/* Chapter 6: 3D Mechanical Numpad Contact Portal */}
           <ContactNumpad />
 
-          {/* Chapter 7: Danah's Secret Garden (Full-Bleed 100% Screen Width Meadow Footer) */}
-          <DanahSecretGarden />
+          {/* Translucent Footer credits */}
+          <footer className="w-full bg-white/75 py-6 text-center text-xs font-medium text-slate-600 backdrop-blur-md border-t border-slate-200/50">
+            Handcrafted with care by Mica Danah Paris &middot; Software Engineer &amp; Applied AI Developer
+          </footer>
         </>
       )}
     </main>
