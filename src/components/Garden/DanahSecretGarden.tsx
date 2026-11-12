@@ -60,6 +60,9 @@ const tone = (c: string) => LEGACY[c] ?? c;
 
 const COOLDOWN_MS = 15000;
 
+/** Height of the garden when shown inside the Projects window (matches the other project pages). */
+const GARDEN_WINDOW_H = "h-[520px] sm:h-[500px]";
+
 /* ───────────────────────── small helpers ───────────────────────── */
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -260,7 +263,7 @@ const terrainY = (x: number, baseY: number, seed: number): number => {
   return baseY - 14 * s1 - 9 * s2 - 5 * s3;
 };
 
-const buildMeadow = (w: number, h: number, dpr: number) => {
+const buildMeadow = (w: number, h: number, dpr: number, compact = false) => {
   const c = document.createElement("canvas");
   c.width = Math.round(w * dpr);
   c.height = Math.round(h * dpr);
@@ -299,11 +302,11 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
     for (let i = 0; i < bladeCnt; i++) {
       const x = lr() * w;
       const y = terrainY(x, baseY, seed) + lr() * 4;
-      const bh = 8 + lr() * bladeMax;
+      const bh = (compact ? 5 : 8) + lr() * bladeMax;
       const bend = (lr() - 0.5) * bh * 0.6;
       ctx.strokeStyle = bladeCol;
       ctx.globalAlpha = 0.3 + lr() * 0.4;
-      ctx.lineWidth = 0.8 + lr() * 1.8;
+      ctx.lineWidth = (0.8 + lr() * 1.8) * (compact ? 0.7 : 1);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.quadraticCurveTo(x + bend * 0.3, y - bh * 0.6, x + bend, y - bh);
@@ -313,16 +316,25 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
   };
 
   /* 3 grass layers, back → front (darkest → brightest) */
-  paintLayer(h - 155, "#dcefd9", "#c7e4cc", "#9bcfae", 360, 52, 7.1);
-  paintLayer(h - 105, "#c9e6cb", "#b2dcba", "#86c49f", 330, 42, 13.3);
-  paintLayer(h - 58, "#b6dfbf", "#9ccfaa", "#74b890", 290, 32, 19.7);
+  if (compact) {
+    /* in the Projects window: deeper greens, shorter blades, layers spread over the full height */
+    paintLayer(h * 0.1, "#bcdcb9", "#a3cfa9", "#74b48b", 300, 26, 7.1);
+    paintLayer(h * 0.36, "#a8d3aa", "#8fc59b", "#5fa67c", 280, 22, 13.3);
+    paintLayer(h * 0.62, "#93c99a", "#7bb98a", "#4f9a70", 260, 18, 19.7);
+  } else {
+    paintLayer(h - 155, "#dcefd9", "#c7e4cc", "#9bcfae", 360, 52, 7.1);
+    paintLayer(h - 105, "#c9e6cb", "#b2dcba", "#86c49f", 330, 42, 13.3);
+    paintLayer(h - 58, "#b6dfbf", "#9ccfaa", "#74b890", 290, 32, 19.7);
+  }
 
   /* scattered leaf clusters */
   const lr = mulberry(500);
   for (let i = 0; i < 55; i++) {
     const x = lr() * w;
-    const y = h - 12 - lr() * 125;
-    ctx.fillStyle = `rgba(110, 180, 140, ${0.18 + lr() * 0.22})`;
+    const y = compact ? h - 10 - lr() * h * 0.7 : h - 12 - lr() * 125;
+    ctx.fillStyle = compact
+      ? `rgba(70, 140, 100, ${0.18 + lr() * 0.22})`
+      : `rgba(110, 180, 140, ${0.18 + lr() * 0.22})`;
     for (let j = 0; j < 3; j++) {
       ctx.beginPath();
       ctx.ellipse(x + (j - 1) * 5, y + lr() * 4, 2.5 + lr() * 3, 4.5 + lr() * 4, lr() * Math.PI, 0, Math.PI * 2);
@@ -332,9 +344,9 @@ const buildMeadow = (w: number, h: number, dpr: number) => {
 
   /* small decorative wildflowers baked into the static grass */
   const petalCols = [BLUSH, CREAM, "#ffffff", "#f7d3df", "#cfe5f7"];
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < (compact ? 9 : 14); i++) {
     const x = 30 + lr() * (w - 60);
-    const y = h - 35 - lr() * 105;
+    const y = compact ? h * 0.86 - lr() * h * 0.6 : h - 35 - lr() * 105;
     const pc = petalCols[Math.floor(lr() * petalCols.length)];
     const petals = 4 + Math.floor(lr() * 3);
     ctx.globalAlpha = 0.55 + lr() * 0.35;
@@ -377,6 +389,8 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
   const pointerRef = useRef<{ x: number; y: number; vx: number } | null>(null);
   const pushRef = useRef(new Map<string, { a: number; v: number }>());
   const inViewRef = useRef<boolean>(false);
+  const [inView, setInView] = useState(false);
+  const wakeRef = useRef<(() => void) | null>(null);
   const spriteCache = useRef(new Map<string, HTMLCanvasElement>());
   const strokesRef = useRef<Stroke[]>([]);
   const curRef = useRef<Stroke | null>(null);
@@ -390,14 +404,23 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
     if (!el) return;
     const ro = new ResizeObserver(([e]) => {
       const w = Math.round(e.contentRect.width);
-      if (w > 0) {
-        const mh = inWindow ? (w < 640 ? 140 : 170) : (w < 640 ? 230 : w < 1024 ? 270 : 310);
+      if (w <= 0) return;
+      if (inWindow) {
+        // inside the Projects window the meadow simply fills the space below the easel
+        const h = Math.round(e.contentRect.height);
+        if (h > 0) setSize((p) => (p.w === w && p.h === h ? p : { w, h }));
+      } else {
+        const mh = w < 640 ? 230 : w < 1024 ? 270 : 310;
         setSize({ w, h: mh });
       }
     });
     ro.observe(el);
     const io = new IntersectionObserver(
-      ([e]) => { inViewRef.current = e.isIntersecting; },
+      ([e]) => {
+        inViewRef.current = e.isIntersecting;
+        setInView(e.isIntersecting);
+        if (e.isIntersecting) wakeRef.current?.(); // restart the render loop
+      },
       { rootMargin: "100px" },
     );
     io.observe(el);
@@ -428,7 +451,9 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(() => {
+      if (!document.hidden && inViewRef.current) load();
+    }, 30000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -441,12 +466,14 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(size.w * dpr);
     canvas.height = Math.round(size.h * dpr);
-    const bg = buildMeadow(size.w, size.h, dpr);
+    const bg = buildMeadow(size.w, size.h, dpr, inWindow);
     spriteCache.current.clear();
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const meadowTop = size.h * 0.12;
-    const meadowBot = size.h * 0.82;
+    const meadowTop = size.h * (inWindow ? 0.14 : 0.12);
+    const meadowBot = size.h * (inWindow ? 0.84 : 0.82);
+    // flower size follows the meadow height (capped so tall phone layouts don't get giant flowers)
+    const unitH = inWindow ? Math.min(size.h, 260) : size.h;
 
     /* wind: waves travel across the meadow, and a slow gust swells every now and then */
     const gustAt = (t: number) => Math.pow(Math.max(0, Math.sin(t / 6500 - 1)), 2);
@@ -459,10 +486,10 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
 
     /* animated foreground grass */
     const gr = mulberry(4242);
-    const blades = Array.from({ length: Math.round(size.w / 5) }, () => ({
+    const blades = Array.from({ length: Math.round(size.w / (inWindow ? 7 : 5)) }, () => ({
       x: gr() * size.w,
-      y: size.h - 4 - gr() * 52,
-      h: 12 + gr() * 22,
+      y: size.h - 4 - gr() * (inWindow ? 34 : 52),
+      h: inWindow ? 7 + gr() * 12 : 12 + gr() * 22,
       ph: gr() * 6.28,
       dark: gr() > 0.5,
     }));
@@ -475,8 +502,10 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
           ctx.moveTo(b.x, b.y);
           ctx.quadraticCurveTo(b.x + w * b.h * 0.25, b.y - b.h * 0.6, b.x + w * b.h * 0.9, b.y - b.h * (1 - Math.abs(w) * 0.12));
         }
-        ctx.strokeStyle = dark ? "rgba(112,184,144,0.8)" : "rgba(168,220,186,0.85)";
-        ctx.lineWidth = dark ? 1.6 : 1.3;
+        ctx.strokeStyle = inWindow
+          ? dark ? "rgba(74,150,106,0.85)" : "rgba(120,188,142,0.85)"
+          : dark ? "rgba(112,184,144,0.8)" : "rgba(168,220,186,0.85)";
+        ctx.lineWidth = inWindow ? (dark ? 1.2 : 1) : dark ? 1.6 : 1.3;
         ctx.stroke();
       }
     };
@@ -534,9 +563,11 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
 
     let raf = 0;
     let last = 0;
+    let running = false;
     const frame = (now: number) => {
+      // off-screen: stop the loop completely (no idle frames); the observer wakes it again
+      if (!inViewRef.current) { running = false; return; }
       raf = requestAnimationFrame(frame);
-      if (!inViewRef.current) { last = now; return; }
       const dt = last ? Math.min(2.5, (now - last) / 16.67) : 1;
       last = now;
 
@@ -552,7 +583,7 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
           const depth = (f.v + 1) / 2; // 0 = back, 1 = front
           return {
             f,
-            px: size.h * 0.22 * (0.5 + 0.5 * depth),
+            px: unitH * (inWindow ? 0.3 : 0.22) * (0.5 + 0.5 * depth),
             x: size.w * 0.5 + f.u * size.w * 0.44,
             y: meadowTop + depth * (meadowBot - meadowTop),
           };
@@ -618,9 +649,20 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
       drawBlades(now);
       if (!reduce) drawPetals(now, dt);
     };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, [size]);
+    const wake = () => {
+      if (running) return;
+      running = true;
+      last = 0;
+      raf = requestAnimationFrame(frame);
+    };
+    wakeRef.current = wake;
+    if (inViewRef.current) wake();
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+      wakeRef.current = null;
+    };
+  }, [size, inWindow]);
 
   /* drawing pad with 100% synchronized coordinates */
   const redrawPad = useCallback(() => {
@@ -809,7 +851,9 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
 
   if (inWindow) {
     return (
-      <div className="relative w-full select-none overflow-hidden rounded-[20px] bg-gradient-to-b from-[#eef6fc] via-[#fceef3] to-[#e8f7ee] border border-pink-100/60 shadow-inner flex flex-col justify-between mt-3 min-h-[500px]">
+      <div
+        className={`relative mt-4 sm:mt-5 flex w-full select-none flex-col overflow-hidden rounded-[20px] border border-pink-100/60 bg-gradient-to-b from-[#eef6fc] via-[#fceef3] to-[#e8f7ee] shadow-inner ${GARDEN_WINDOW_H}`}
+      >
         <style>{`
           @keyframes garden-drift {
             0% { transform: scale(1.02) translate3d(0, 0, 0); }
@@ -822,14 +866,7 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
             filter: saturate(0.78) brightness(1.06);
             opacity: 0.68;
           }
-          .gd-pill {
-            position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .45rem;
-            border-radius: 9999px; border: 1px solid rgba(148,163,184,.45); padding: .35rem .85rem;
-            font-size: 12.5px; font-weight: 500; color: #334155; white-space: nowrap;
-            background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(245,245,248,0.85));
-            box-shadow: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(15,23,42,.05), 0 4px 10px -6px rgba(15,23,42,.2);
-          }
-          .gd-chip { padding: .2rem .65rem; font-size: 11px; }
+          @media (prefers-reduced-motion: reduce) { .garden-bg-anim { animation: none; } }
           .gd-grad {
             background: linear-gradient(135deg, #0b0b10 10%, #4a1236 50%, #f0568f 100%);
             -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -839,71 +876,41 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
             -webkit-backdrop-filter: blur(24px) saturate(1.4);
             backdrop-filter: blur(24px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 1px rgba(255, 180, 200, 0.2), 0 20px 40px -12px rgba(130, 40, 70, 0.15);
+            box-shadow: 0 0 0 1px rgba(255, 180, 200, 0.2), 0 16px 32px -12px rgba(130, 40, 70, 0.15);
           }
         `}</style>
 
-        {/* Floating Animated Cloud Background Layer */}
+        {/* Floating cloud background (its animation pauses whenever the garden is off-screen) */}
         <div
           aria-hidden
-          className="garden-bg-anim pointer-events-none absolute inset-[-3%] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/assets/images/stickers/garden-background2.png')",
-          }}
+          className={`garden-bg-anim pointer-events-none absolute inset-[-3%] bg-cover bg-center ${inView ? "" : "[animation-play-state:paused]"
+            }`}
+          style={{ backgroundImage: "url('/assets/images/stickers/garden-background2.png')" }}
         />
 
-        {/* Milky Wash Overlay */}
+        {/* Milky wash overlay */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-1 bg-gradient-to-b from-white/40 via-[#e8f2fb]/45 to-[#f9e8ef]/35"
         />
 
-        {/* Content area: Header & Easel */}
-        <div className="relative z-10 w-full pt-3 px-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
-                Danah&apos;s <span className="gd-grad">Secret Garden</span>
-              </h3>
-              <p className="text-xs text-slate-600">
-                Draw a flower, our AI validates your bloom, and it plants into our shared meadow.
-              </p>
-            </div>
-            <div className="gd-pill gd-chip shadow-xs">
-              <span className="h-2 w-2 rounded-full bg-[#8fc3ea]" />
-              <span className="font-semibold text-slate-800">{flowers.length} wildflowers blooming</span>
-            </div>
+        {/* Header + compact drawing easel */}
+        <div className="relative z-10 w-full px-4 pt-3 sm:px-5">
+          <div>
+            <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
+              Danah&apos;s <span className="gd-grad">Secret Garden</span>
+            </h3>
+            <p className="hidden sm:block text-[11.5px] text-slate-600">
+              Draw a flower, our AI validates your bloom, and it plants into our shared meadow.
+            </p>
           </div>
 
-          {/* Frosted Glass Drawing Card */}
-          <aside className="garden-glass mx-auto my-3 w-full max-w-[270px] sm:max-w-[290px] rounded-2xl p-3.5 sm:p-4">
-            <h4 className="text-center text-xs font-semibold tracking-tight text-slate-800">
-              Draw a flower, plant it below
-            </h4>
-
-            {/* palette */}
-            <div className="mt-2 flex items-center justify-center gap-2">
-              {PAINT.map((p) => (
-                <button
-                  key={p.hex}
-                  type="button"
-                  title={p.name}
-                  aria-label={p.name}
-                  onClick={() => setColor(p.hex)}
-                  style={{ backgroundColor: p.hex }}
-                  className={`h-6 w-6 rounded-full border border-black/10 transition ${
-                    color === p.hex
-                      ? "scale-110 ring-2 ring-slate-800 ring-offset-2"
-                      : "hover:scale-105"
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* drawing canvas — strictly 1:1 square internal resolution */}
-            <div className="relative mt-2.5 aspect-square w-full touch-none rounded-xl border border-slate-200/90 bg-white/95 shadow-inner overflow-hidden">
+          {/* Compact frosted-glass easel: small pad on the left, tools on the right */}
+          <aside className="garden-glass mx-auto mt-2.5 grid w-full max-w-[400px] grid-cols-[auto_1fr] gap-3 rounded-2xl p-3">
+            {/* drawing pad: strictly 1:1 square internal resolution */}
+            <div className="relative aspect-square w-[132px] sm:w-[148px] touch-none overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 shadow-inner">
               {strokeCount === 0 && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-medium text-slate-400">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-3 text-center text-[10.5px] font-medium leading-snug text-slate-400">
                   draw a flower, then a stem and a leaf
                 </div>
               )}
@@ -919,73 +926,100 @@ export const DanahSecretGarden: React.FC<DanahSecretGardenProps> = ({ inWindow =
               />
             </div>
 
-            {/* controls */}
-            <div className="mt-2 flex items-center justify-between text-xs font-medium text-slate-500">
-              <button
-                type="button"
-                onClick={undo}
-                disabled={strokeCount === 0}
-                className="flex items-center gap-1 hover:text-slate-800 transition disabled:opacity-30"
-              >
-                <Undo2 className="h-3 w-3" />
-                <span>undo</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSurprise}
-                className="text-pink-600 hover:text-pink-700 font-semibold transition text-xs"
-              >
-                surprise me
-              </button>
-              <button
-                type="button"
-                onClick={clearPad}
-                disabled={strokeCount === 0}
-                className="flex items-center gap-1 hover:text-slate-800 transition disabled:opacity-30"
-              >
-                <RotateCcw className="h-3 w-3" />
-                <span>clear</span>
-              </button>
-            </div>
+            <div className="flex min-w-0 flex-col justify-between">
+              <h4 className="text-[11px] font-semibold leading-tight tracking-tight text-slate-800">
+                Draw a flower, plant it below
+              </h4>
 
-            {/* AI plant button */}
-            <button
-              type="button"
-              onClick={validateAndPlant}
-              disabled={strokeCount === 0 || validating}
-              className="relative mt-2.5 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-[#e0628f]/70 py-2 text-[13px] font-medium text-[#4a1230] transition active:translate-y-px disabled:opacity-40"
-              style={{
-                background: "linear-gradient(180deg,#ffc9db 0%,#ff9bbd 48%,#fb7fa9 52%,#ffa8c6 100%)",
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 6px 14px -5px rgba(244,114,182,.6)",
-                textShadow: "0 1px 0 rgba(255,255,255,.55)",
-              }}
-            >
-              <span className="pointer-events-none absolute inset-x-3 top-[2px] h-[44%] rounded-full bg-gradient-to-b from-white/75 to-white/5" />
-              {validating ? (
-                <>
-                  <svg className="relative h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span className="relative">Checking...</span>
-                </>
-              ) : (
-                <>
-                  <Sprout className="relative h-3.5 w-3.5" />
-                  <span className="relative">Plant Wildflower</span>
-                </>
-              )}
-            </button>
-            <p className={`mt-1 min-h-[1rem] text-center text-[11px] font-medium transition-colors ${
-              note.startsWith("Beautiful") || note.startsWith("Checking") ? "text-[#4f9a73]" : "text-rose-500"
-            }`}>
-              {note}
-            </p>
+              {/* palette */}
+              <div className="flex items-center gap-1.5">
+                {PAINT.map((p) => (
+                  <button
+                    key={p.hex}
+                    type="button"
+                    title={p.name}
+                    aria-label={p.name}
+                    onClick={() => setColor(p.hex)}
+                    style={{ backgroundColor: p.hex }}
+                    className={`h-5 w-5 rounded-full border border-black/10 transition ${color === p.hex
+                      ? "scale-110 ring-2 ring-slate-800 ring-offset-1"
+                      : "hover:scale-105"
+                      }`}
+                  />
+                ))}
+              </div>
+
+              {/* controls */}
+              <div className="flex items-center justify-between text-[11px] font-medium text-slate-500">
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={strokeCount === 0}
+                  aria-label="Undo"
+                  className="flex items-center gap-1 transition hover:text-slate-800 disabled:opacity-30"
+                >
+                  <Undo2 className="h-3 w-3" />
+                  <span className="hidden sm:inline">undo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSurprise}
+                  className="font-semibold text-pink-600 transition hover:text-pink-700"
+                >
+                  surprise me
+                </button>
+                <button
+                  type="button"
+                  onClick={clearPad}
+                  disabled={strokeCount === 0}
+                  aria-label="Clear"
+                  className="flex items-center gap-1 transition hover:text-slate-800 disabled:opacity-30"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span className="hidden sm:inline">clear</span>
+                </button>
+              </div>
+
+              {/* AI plant button */}
+              <button
+                type="button"
+                onClick={validateAndPlant}
+                disabled={strokeCount === 0 || validating}
+                className="relative flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-[#e0628f]/70 py-1.5 text-[12px] font-medium text-[#4a1230] transition active:translate-y-px disabled:opacity-40"
+                style={{
+                  background: "linear-gradient(180deg,#ffc9db 0%,#ff9bbd 48%,#fb7fa9 52%,#ffa8c6 100%)",
+                  boxShadow: "inset 0 1px 1px rgba(255,255,255,.9), inset 0 -1px 2px rgba(190,40,100,.25), 0 6px 14px -5px rgba(244,114,182,.6)",
+                  textShadow: "0 1px 0 rgba(255,255,255,.55)",
+                }}
+              >
+                <span className="pointer-events-none absolute inset-x-3 top-[2px] h-[44%] rounded-full bg-gradient-to-b from-white/75 to-white/5" />
+                {validating ? (
+                  <>
+                    <svg className="relative h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="relative">Checking...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sprout className="relative h-3.5 w-3.5" />
+                    <span className="relative">Plant Wildflower</span>
+                  </>
+                )}
+              </button>
+              <p
+                className={`min-h-[0.9rem] text-center text-[10.5px] font-medium leading-tight transition-colors ${note.startsWith("Beautiful") || note.startsWith("Checking") ? "text-[#4f9a73]" : "text-rose-500"
+                  }`}
+              >
+                {note}
+              </p>
+            </div>
           </aside>
         </div>
 
-        {/* Meadow canvas at the bottom */}
-        <div ref={wrapRef} className="relative z-10 w-full mt-auto" style={{ height: size.h }}>
+        {/* Meadow: takes all the remaining height so the flowers have room */}
+        <div ref={wrapRef} className="relative z-10 mt-2 min-h-[150px] w-full flex-1">
           <canvas
             ref={sceneRef}
             style={{ width: size.w, height: size.h }}
