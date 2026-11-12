@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   Wifi, 
   FileText, 
@@ -105,6 +106,13 @@ export const MacMenuBar: React.FC<MacMenuBarProps> = ({
         >
           Secret Garden
         </button>
+
+        <Link
+          href="/blogs"
+          className="hover:text-black transition hidden xl:inline-block text-slate-700 font-medium tracking-tight"
+        >
+          Stories
+        </Link>
       </div>
 
       {/* Right side: One Page View, Controls, Wifi, Horizontal Battery, Clock */}

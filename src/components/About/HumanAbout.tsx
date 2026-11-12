@@ -1,9 +1,18 @@
 "use client";
 
-import React, { useEffect, useId, useRef } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
-import { MapPin, Sprout, Cookie, Pencil } from "lucide-react";
+import Link from "next/link";
+import {
+  MapPin,
+  Sprout,
+  Cookie,
+  Pencil,
+  Compass,
+  ArrowRight,
+} from "lucide-react";
 import { PORTFOLIO_DATA } from "@/data/portfolioData";
+import { BLOG_POSTS } from "@/data/blogsData";
 import { playUiClick } from "@/utils/sound";
 
 interface HumanAboutProps {
@@ -15,11 +24,12 @@ interface HumanAboutProps {
 /*  Content (kept short on purpose)                                    */
 /* ------------------------------------------------------------------ */
 const QUOTE =
-  "I am always doing what I can't do yet in order to learn how to do it.";
+  "I am always doing that which I cannot do, in order that I may learn how to do it.";
 
 const OFF_SCREEN = [
-  { label: "Plants", Icon: Sprout },
-  { label: "Baking", Icon: Cookie },
+  { label: "Travelling & discovering new places", Icon: Compass },
+  { label: "Growing plants", Icon: Sprout },
+  { label: "Baking warm pastries", Icon: Cookie },
   { label: "Sketching", Icon: Pencil },
 ];
 
@@ -117,6 +127,63 @@ const Headline: React.FC<{ words: string[]; accentFrom: number }> = ({
 export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
   const rootRef = useRef<HTMLElement>(null);
   const profile = PORTFOLIO_DATA.profile;
+  const [activeBlogIdx, setActiveBlogIdx] = useState(0);
+  const [cardTab, setCardTab] = useState<"stories" | "hobbies">("stories");
+  const [isHovered, setIsHovered] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const isMouseDown = useRef(false);
+  const mouseStartX = useRef<number | null>(null);
+
+  // Auto-swipe infinitely every 4.5 seconds
+  useEffect(() => {
+    if (cardTab !== "stories" || isHovered) return;
+    const timer = setInterval(() => {
+      setActiveBlogIdx((prev) => (prev + 1) % BLOG_POSTS.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [cardTab, isHovered]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
+    touchStartX.current = null;
+    if (Math.abs(deltaX) > 40) {
+      if (deltaX > 0) {
+        setActiveBlogIdx((prev) => (prev + 1) % BLOG_POSTS.length);
+      } else {
+        setActiveBlogIdx((prev) => (prev === 0 ? BLOG_POSTS.length - 1 : prev - 1));
+      }
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isMouseDown.current = true;
+    mouseStartX.current = e.clientX;
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isMouseDown.current || mouseStartX.current === null) return;
+    const deltaX = mouseStartX.current - e.clientX;
+    isMouseDown.current = false;
+    mouseStartX.current = null;
+    if (Math.abs(deltaX) > 35) {
+      if (deltaX > 0) {
+        setActiveBlogIdx((prev) => (prev + 1) % BLOG_POSTS.length);
+      } else {
+        setActiveBlogIdx((prev) => (prev === 0 ? BLOG_POSTS.length - 1 : prev - 1));
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    isMouseDown.current = false;
+    mouseStartX.current = null;
+  };
 
   const openFolder = (id: string) => {
     playUiClick(true);
@@ -332,34 +399,153 @@ export const HumanAbout: React.FC<HumanAboutProps> = ({ onFolderClick }) => {
           {/* bio */}
           <div data-reveal className="ha-tile flex flex-col justify-center p-7 md:col-span-2" style={v(120, "40px")}>
             <p className="text-xl font-semibold leading-snug tracking-tight text-slate-900 sm:text-2xl">
-              I grew up tinkering with computers and never really stopped.
+              Building intuitive applications with technology and people in mind.
             </p>
-            <p className="mt-2 text-slate-500">
-              Now I turn curiosity into apps people actually enjoy using.
-            </p>
-          </div>
-
-          {/* how I work */}
-          <div data-reveal className="ha-tile flex flex-col justify-between p-6" style={v(240)}>
-            <span className="text-sm font-semibold text-slate-900">How I work</span>
-            <p className="text-[15px] leading-snug text-slate-500">
-              Listen first, ask lots of questions, then test with real users.
+            <p className="mt-2.5 text-[15px] leading-relaxed text-slate-500">
+              I enjoy exploring new technologies, solving problems, and developing applications that are functional, intuitive, and thoughtfully designed.
             </p>
           </div>
 
-          {/* away from the screen */}
-          <div data-reveal className="ha-tile flex flex-col justify-between p-6" style={v(360)}>
-            <span className="text-sm font-semibold text-slate-900">Off screen</span>
-            <ul className="space-y-2">
-              {OFF_SCREEN.map(({ label, Icon }) => (
-                <li key={label} className="flex items-center gap-2.5 text-[15px] text-slate-600">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-b from-pink-50 to-pink-100 text-pink-600 ring-1 ring-pink-200/70">
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
-                  {label}
-                </li>
-              ))}
-            </ul>
+          {/* AI as a tool */}
+          <div data-reveal className="ha-tile flex h-full min-h-[200px] flex-col justify-between p-5 sm:p-6" style={v(240)}>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-pink-400" />
+              <span className="text-sm font-semibold text-slate-900">AI as a tool</span>
+            </div>
+            <p className="text-[13.5px] sm:text-[14px] leading-relaxed text-slate-600">
+              Using AI to explore possibilities and bring ideas to life. I like experimenting, asking questions, and finding the cleanest solution for real users.
+            </p>
+          </div>
+
+          {/* Stories & Hobbies Card (Full-bleed Background Image with Mouse/Touch Swipe & Infinite Auto-swipe) */}
+          <div
+            data-reveal
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="ha-tile relative flex h-full min-h-[200px] flex-col justify-between overflow-hidden p-5 sm:p-6 cursor-grab active:cursor-grabbing select-none"
+            style={v(360)}
+          >
+            {cardTab === "stories" ? (
+              <>
+                {/* Full-bleed Background Image */}
+                <Image
+                  key={BLOG_POSTS[activeBlogIdx].id}
+                  src={BLOG_POSTS[activeBlogIdx].image}
+                  alt={BLOG_POSTS[activeBlogIdx].title}
+                  fill
+                  sizes="(min-width: 768px) 30vw, 100vw"
+                  className="object-cover object-center transition-all duration-700 ease-out"
+                />
+
+                {/* Dark Vignette Overlay for readable text */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/35 z-1" />
+
+                {/* Top Controls: Tab Switcher & Progress Bars */}
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="inline-flex items-center gap-1 rounded-full bg-black/40 backdrop-blur-md p-0.5 border border-white/20">
+                    <button
+                      type="button"
+                      onClick={() => setCardTab("stories")}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold transition bg-white text-slate-900 shadow-xs"
+                    >
+                      Stories
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCardTab("hobbies")}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold transition text-white/80 hover:text-white"
+                    >
+                      Hobbies
+                    </button>
+                  </div>
+
+                  {/* Infinite Story Progress Indicators */}
+                  <div className="flex items-center gap-1.5">
+                    {BLOG_POSTS.map((_, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveBlogIdx(idx)}
+                        aria-label={`Go to story ${idx + 1}`}
+                        className={`h-1.5 rounded-full transition-all duration-500 ${
+                          idx === activeBlogIdx
+                            ? "w-5 bg-white shadow-xs"
+                            : "w-1.5 bg-white/40 hover:bg-white/70"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Story Content Overlay (Clean Headline & Subtitle without chips) */}
+                <div className="relative z-10 mt-auto pt-4 space-y-1.5">
+                  <h4 className="text-[15px] sm:text-[16px] font-bold text-white leading-snug drop-shadow-sm">
+                    &ldquo;{BLOG_POSTS[activeBlogIdx].title}&rdquo;
+                  </h4>
+
+                  <p className="text-[12px] text-white/80 line-clamp-1 leading-normal">
+                    {BLOG_POSTS[activeBlogIdx].subtitle}
+                  </p>
+
+                  <div className="pt-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-white/60">
+                      {BLOG_POSTS[activeBlogIdx].readTime}
+                    </span>
+                    <Link
+                      href={`/blogs#${BLOG_POSTS[activeBlogIdx].slug}`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-pink-300 hover:text-white transition"
+                    >
+                      <span>Read Story</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Hobbies View */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setCardTab("stories")}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold transition text-slate-500 hover:text-slate-900"
+                    >
+                      Stories
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCardTab("hobbies")}
+                      className="px-2.5 py-0.5 rounded-full text-xs font-semibold transition bg-slate-900 text-white shadow-2xs"
+                    >
+                      Hobbies
+                    </button>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">Personal</span>
+                </div>
+
+                <div className="my-auto py-2">
+                  <ul className="space-y-2 text-xs sm:text-[13px] text-slate-700">
+                    {OFF_SCREEN.map(({ label, Icon }) => (
+                      <li key={label} className="flex items-center gap-2.5">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-pink-50 text-pink-500 shrink-0">
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="font-medium text-slate-800">{label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 text-[11px] font-mono text-slate-400">
+                  Off-screen interests &amp; creativity
+                </div>
+              </>
+            )}
           </div>
 
           {/* quote: words light up as you scroll */}

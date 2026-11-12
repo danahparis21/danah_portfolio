@@ -45,34 +45,40 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white text-slate-900 relative">
-      {/* Recruiter ATS View Mode */}
+      {/* Top macOS Menu Bar — Always present to preserve the portfolio shell */}
+      <MacMenuBar
+        recruiterMode={recruiterMode}
+        onToggleRecruiterMode={handleToggleRecruiterMode}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onOpenSection={(sec) => {
+          if (recruiterMode) setRecruiterMode(false);
+          scrollToSection(sec);
+        }}
+        onToggleControlCenter={() => setIsControlCenterOpen(!isControlCenterOpen)}
+      />
+
+      {/* Apple iOS / macOS Glassmorphic Control Center Modal */}
+      <ControlCenterModal
+        isOpen={isControlCenterOpen}
+        onClose={() => setIsControlCenterOpen(false)}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onOpenSection={(sec) => {
+          if (recruiterMode) setRecruiterMode(false);
+          scrollToSection(sec);
+        }}
+        recruiterMode={recruiterMode}
+        onToggleRecruiterMode={handleToggleRecruiterMode}
+      />
+
+      {/* View Switcher: Minimalist One Page View vs. Full Interactive Danah OS */}
       {recruiterMode ? (
-        <div className="pt-10">
+        <div className="pt-12 sm:pt-14">
           <RecruiterResumeView onExit={handleToggleRecruiterMode} />
         </div>
       ) : (
         <>
-          {/* Top macOS Menu Bar */}
-          <MacMenuBar
-            recruiterMode={recruiterMode}
-            onToggleRecruiterMode={handleToggleRecruiterMode}
-            soundEnabled={soundEnabled}
-            onToggleSound={handleToggleSound}
-            onOpenSection={scrollToSection}
-            onToggleControlCenter={() => setIsControlCenterOpen(!isControlCenterOpen)}
-          />
-
-          {/* Apple iOS / macOS Glassmorphic Control Center Modal */}
-          <ControlCenterModal
-            isOpen={isControlCenterOpen}
-            onClose={() => setIsControlCenterOpen(false)}
-            soundEnabled={soundEnabled}
-            onToggleSound={handleToggleSound}
-            onOpenSection={scrollToSection}
-            recruiterMode={recruiterMode}
-            onToggleRecruiterMode={handleToggleRecruiterMode}
-          />
-
           {/* Chapter 1: Hero Section */}
           <HeroStationery
             onScrollDown={() => scrollToSection("about")}

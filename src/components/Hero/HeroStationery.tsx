@@ -1,13 +1,23 @@
 "use client";
 
-import React, { useEffect, useId, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Pixelify_Sans } from "next/font/google";
 import { FileDown, ArrowDown, MapPin } from "lucide-react";
 import { LinkedinIcon } from "@/components/UI/Icons";
 import { PORTFOLIO_DATA } from "@/data/portfolioData";
 import { playUiClick } from "@/utils/sound";
 
+/* Pixel display font for the name, role and statement */
+const pixel = Pixelify_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 interface HeroStationeryProps {
+  /** Set to false while a loader overlay sits on top; the boot sequence starts when it becomes true. */
+  ready?: boolean;
   onResumeClick?: () => void;
   onScrollDown?: () => void;
   /** Called with the folder id when a folder is clicked. Falls back to scrolling to #id. */
@@ -32,6 +42,22 @@ const SOCIALS = [
     Icon: LinkedinIcon,
   },
 ];
+
+/* Boot sequence timeline (seconds after the hero starts booting) */
+const T = {
+  name: 0.3,
+  role: 0.95,
+  statement: 1.65,
+  folders: 1.3,
+  location: 2.4,
+  buttons: 2.2,
+  hud: 0.4,
+};
+/* Collaborator cursors */
+const CURSOR_COLOR = "#ec4899"; // one color for every cursor, box and tag
+const CURSOR_NAMES = ["Mica", "Danah", "Paris", "Pixel", "Bot", "AI"];
+const BOOT_MS = 3800; // flower formation time
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 /* ------------------------------------------------------------------ */
 /*  Pink macOS-style folder (Matches About Me color exactly)          */
@@ -124,7 +150,342 @@ const DraggableFolder: React.FC<{
 };
 
 /* ------------------------------------------------------------------ */
-/*  3D Star Lily Point Cloud (Curved Chalice, Soft Depth & Glow)      */
+/*  Boot-sequence helpers: multiplayer-cursor "timelapse" build        */
+/* ------------------------------------------------------------------ */
+
+function mulberry(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+type Vec = [number, number];
+const SCRAMBLE = "01#%&$<>/|+*=_";
+
+/** Figma / Canva style multiplayer cursor with a name tag */
+const Cursor: React.FC<{ color: string; name: string }> = ({ color, name }) => (
+  <span aria-hidden className="pointer-events-none absolute left-0 top-0 z-40 block">
+    <svg
+      width="20"
+      height="24"
+      viewBox="0 0 20 24"
+      className="block drop-shadow-[0_2px_3px_rgba(15,23,42,0.28)]"
+    >
+      <path
+        d="M2 1.5v18.2l4.7-4.4 3.3 7.4 3.3-1.5-3.2-7.2h6.6L2 1.5Z"
+        fill={color}
+        stroke="#fff"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span
+      className="absolute left-4 top-5 whitespace-nowrap rounded-full px-2 py-[2px] text-[10px] font-semibold leading-tight text-white shadow-sm"
+      style={{ background: color }}
+    >
+      {name}
+    </span>
+  </span>
+);
+
+/**
+ * A collaborator "builds" this element: a cursor flies in, grabs the bottom-right
+ * handle of a selection box and drags it open while the element is revealed
+ * behind it (like a Canva / Figma timelapse). Then the box and cursor leave.
+ */
+const BuildBlock: React.FC<{
+  play: boolean;
+  delay?: number;
+  color: string;
+  name: string;
+  from?: Vec;
+  to?: Vec;
+  blur?: number;
+  className?: string;
+  children: React.ReactNode;
+}> = ({
+  play,
+  delay = 0,
+  color,
+  name,
+  from = [-240, -160],
+  to = [200, 160],
+  blur = 0,
+  className = "",
+  children,
+}) => {
+    const reduce = useReducedMotion();
+    const ref = useRef<HTMLDivElement>(null);
+    const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+
+    useEffect(() => {
+      if (!play || reduce || !ref.current) return;
+      setSize({ w: ref.current.offsetWidth, h: ref.current.offsetHeight });
+    }, [play, reduce]);
+
+    if (reduce) return <div className={`w-fit ${className}`}>{children}</div>;
+
+    const GROW_AT = 0.45; // cursor arrives, then starts dragging
+    const GROW = 0.7;
+    const TOTAL = 1.65;
+    const W = size?.w ?? 0;
+    // generous insets so shadows and blurred ghosts are never cut by the reveal mask
+    const hidden = `inset(-90px ${W}px -90px -90px)`;
+    const shown = "inset(-90px -90px -90px -90px)";
+
+    return (
+      <div ref={ref} className={`relative w-fit ${className}`}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={
+            size
+              ? {
+                opacity: 1,
+                clipPath: [hidden, shown],
+                ...(blur ? { filter: [`blur(${blur}px)`, "blur(0px)"] } : {}),
+              }
+              : undefined
+          }
+          transition={{
+            delay: delay + GROW_AT,
+            duration: GROW,
+            ease: EASE,
+            opacity: { delay: delay + GROW_AT, duration: 0.01 },
+          }}
+        >
+          {children}
+        </motion.div>
+
+        {size && (
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute -left-1.5 -top-1.5 z-30"
+            style={{
+              height: size.h + 12,
+              border: `1.5px solid ${color}`,
+              background: `${color}12`,
+            }}
+            initial={{ opacity: 0, width: 14 }}
+            animate={{ opacity: [0, 1, 1, 0], width: size.w + 12 }}
+            transition={{
+              opacity: { delay, duration: TOTAL, times: [0, 0.1, 0.82, 1] },
+              width: { delay: delay + GROW_AT, duration: GROW, ease: EASE },
+            }}
+          >
+            {/* corner handles */}
+            {["-left-[4.5px] -top-[4.5px]", "-right-[4.5px] -top-[4.5px]", "-left-[4.5px] -bottom-[4.5px]", "-right-[4.5px] -bottom-[4.5px]"].map((p) => (
+              <span
+                key={p}
+                className={`absolute h-[7px] w-[7px] bg-white ${p}`}
+                style={{ border: `1.5px solid ${color}` }}
+              />
+            ))}
+
+            {/* live size tag */}
+            {size.w > 90 && (
+              <span
+                className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-px font-mono text-[9px] font-semibold text-white"
+                style={{ background: color }}
+              >
+                {Math.round(size.w)} × {Math.round(size.h)}
+              </span>
+            )}
+
+            {/* the collaborator's cursor rides the bottom-right handle */}
+            <motion.span
+              className="absolute -bottom-[3px] -right-[3px] block h-0 w-0"
+              initial={{ x: from[0], y: from[1], opacity: 0 }}
+              animate={{
+                x: [from[0], 0, 0, to[0]],
+                y: [from[1], 0, 0, to[1]],
+                opacity: [0, 1, 1, 0],
+              }}
+              transition={{
+                delay,
+                duration: TOTAL,
+                times: [0, 0.28, 0.72, 1],
+                ease: "easeInOut",
+                opacity: { delay, duration: TOTAL, times: [0, 0.08, 0.82, 1] },
+              }}
+            >
+              <Cursor color={color} name={name} />
+            </motion.span>
+          </motion.span>
+        )}
+      </div>
+    );
+  };
+
+/** A cursor grabs the element somewhere off screen and drops it into place. */
+const DropIn: React.FC<{
+  play: boolean;
+  delay?: number;
+  color: string;
+  name: string;
+  from?: Vec;
+  showCursor?: boolean;
+  children: React.ReactNode;
+}> = ({ play, delay = 0, color, name, from = [120, -160], showCursor = true, children }) => {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      className="relative"
+      initial={reduce ? false : { x: from[0], y: from[1], opacity: 0, scale: 0.7 }}
+      animate={play || reduce ? { x: 0, y: 0, opacity: 1, scale: 1 } : undefined}
+      transition={{
+        delay,
+        duration: 0.9,
+        ease: EASE,
+        opacity: { delay, duration: 0.2 },
+      }}
+    >
+      {children}
+      {showCursor && !reduce && play && (
+        <motion.span
+          className="pointer-events-none absolute left-[68%] top-[14%] z-40 block h-0 w-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 1, 1, 0], x: [0, 0, 0, 40], y: [0, 0, 0, -34] }}
+          transition={{ delay, duration: 1.5, times: [0, 0.1, 0.68, 1] }}
+        >
+          <Cursor color={color} name={name} />
+        </motion.span>
+      )}
+    </motion.div>
+  );
+};
+
+/** Pixel-font text that decodes from random glyphs (used for the subtitle only). */
+const DecodeText: React.FC<{
+  text: string;
+  play: boolean;
+  delay?: number;
+  color: string;
+  className?: string;
+}> = ({ text, play, delay = 0, color, className }) => {
+  const reduce = useReducedMotion();
+  const [elapsed, setElapsed] = useState(-1);
+
+  useEffect(() => {
+    if (!play || reduce) return;
+    const t0 = performance.now();
+    const total = (delay + text.length * 0.02 + 0.5) * 1000 + 100;
+    const id = setInterval(() => {
+      const e = performance.now() - t0;
+      setElapsed(e);
+      if (e > total) clearInterval(id);
+    }, 45);
+    return () => clearInterval(id);
+  }, [play, reduce, delay, text.length]);
+
+  const words = useMemo(() => {
+    let i = 0;
+    return text.split(" ").map((w) => Array.from(w).map((ch) => ({ ch, i: i++ })));
+  }, [text]);
+
+  const shown = (ch: string, i: number) => {
+    if (reduce) return ch;
+    const settleAt = (delay + i * 0.02) * 1000;
+    if (elapsed >= settleAt) return ch;
+    return SCRAMBLE[(i * 7 + ((elapsed / 45) | 0) * 13 + 99) % SCRAMBLE.length];
+  };
+
+  return (
+    <span className={className} style={{ color }}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden>
+        {words.map((word, wi) => (
+          <React.Fragment key={wi}>
+            <span className="inline-block whitespace-nowrap">
+              {word.map(({ ch, i }) => (
+                <span key={i} className="relative inline-block">
+                  <span className="invisible">{ch}</span>
+                  <span className="absolute left-0 top-0">{shown(ch, i)}</span>
+                </span>
+              ))}
+            </span>
+            {wi < words.length - 1 ? " " : null}
+          </React.Fragment>
+        ))}
+      </span>
+    </span>
+  );
+};
+
+/**
+ * Name / title text with a hover effect: each letter you touch turns into a
+ * blurred, grainy smear (like the "web designer" inspo) and then resolves back
+ * to sharp. Letters next to it soften a little, so it feels like a ripple.
+ */
+const NoisyText: React.FC<{
+  text: string;
+  strength?: "lg" | "sm";
+  accentAmp?: boolean;
+  className?: string;
+}> = ({ text, strength = "lg", accentAmp = false, className }) => {
+  const words = useMemo(() => {
+    let i = 0;
+    return text.split(" ").map((w) => Array.from(w).map((ch) => ({ ch, i: i++ })));
+  }, [text]);
+
+  return (
+    <span className={className}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden>
+        {words.map((word, wi) => (
+          <React.Fragment key={wi}>
+            <span className="inline-block whitespace-nowrap">
+              {word.map(({ ch, i }) => (
+                <span
+                  key={i}
+                  className={`hs-noisy relative inline-block ${accentAmp && ch === "&" ? "text-[#ec4899]" : ""}`}
+                >
+                  <span className="hs-noisy-base">{ch}</span>
+                  <span
+                    className={`hs-noisy-fx absolute left-0 top-0 ${strength === "lg" ? "hs-noisy-lg" : "hs-noisy-sm"}`}
+                  >
+                    {ch}
+                  </span>
+                </span>
+              ))}
+            </span>
+            {wi < words.length - 1 ? " " : null}
+          </React.Fragment>
+        ))}
+      </span>
+    </span>
+  );
+};
+
+/** Simple flicker-in for small HUD text. */
+const SwarmBlock: React.FC<{
+  play: boolean;
+  delay?: number;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ play, delay = 0, className = "", children }) => {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      className={className}
+      initial={reduce ? false : { opacity: 0, x: -20 }}
+      animate={
+        play || reduce
+          ? { opacity: [0, 1, 0.25, 1, 0.55, 1], x: [-20, 8, -5, 2, 0, 0] }
+          : undefined
+      }
+      transition={{ delay, duration: reduce ? 0 : 0.7, times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  3D Star Lily Point Cloud (structured petals: veins, edge, throat) */
 /* ------------------------------------------------------------------ */
 
 type Cloud = {
@@ -136,17 +497,18 @@ type Cloud = {
   g: Uint8Array;
   b: Uint8Array;
   ink: Float32Array;
+  /** boot order: 0 = forms first (stem), 1 = forms last (petal tips) */
+  ord: Float32Array;
+  /** scatter vector used while the point is still assembling */
+  jx: Float32Array;
+  jy: Float32Array;
+  jz: Float32Array;
 };
 
-function mulberry(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+const sstep = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
 function buildFlower(): Cloud {
   const rnd = mulberry(42);
@@ -174,7 +536,6 @@ function buildFlower(): Cloud {
     const st = Math.sin(baseAngle);
 
     // Dense regular 2D grid (110 length steps x 64 width steps = 7,040 points per petal)
-    // Completely eliminates Poisson clustering gaps, guaranteeing solid, gap-free petals with zero blank spaces!
     const U_STEPS = 110;
     const V_STEPS = 64;
     for (let iu = 0; iu < U_STEPS; iu++) {
@@ -182,13 +543,13 @@ function buildFlower(): Cloud {
       for (let iv = 0; iv < V_STEPS; iv++) {
         const v = ((iv + 0.5) / V_STEPS) * 2 - 1;
 
-        // Broad oval/rounded petal width (not skinny spikes!)
+        // Broad oval/rounded petal width
         const widthProfile = 0.52 * Math.sin(Math.PI * Math.pow(u, 0.68)) * (1 - 0.12 * Math.pow(u, 3));
         const dist = petalLen * Math.pow(u, 0.9);
 
         // Flaring upward & outward trumpet curve
         let py = 0.92 * Math.pow(u, 0.78) - 0.38 * Math.pow(u, 2.0) + petalLift * u;
-        py += 0.22 * (v * v) * Math.sin(Math.PI * u); // realistic cupped petal curve
+        py += 0.22 * (v * v) * Math.sin(Math.PI * u); // cupped petal curve
         py += 0.02 * Math.sin(u * 14 + v * 3.5); // soft organic waviness
 
         const lateral = v * widthProfile;
@@ -200,49 +561,45 @@ function buildFlower(): Cloud {
         const ry = py * cosT - pz * sinT + flowerHeadY;
         const rz = py * sinT + pz * cosT;
 
-        // Smooth continuous botanical shading (no hard edges or triangular wedges):
-        // 1. Soft radial chartreuse throat glow at base of cup
-        const throatGlow = Math.exp(-Math.pow(u / 0.24, 2.2));
+        /* ---- Structured petal coloring (distinct zones, not one long blend) ---- */
+        const av = Math.abs(v);
 
-        // 2. Smooth Gaussian midrib vein running down the central spine of the petal
-        const ribVein = Math.exp(-Math.pow(v / 0.35, 2)) * Math.sin(Math.PI * Math.pow(u, 0.65));
+        // 1. Body zones: ruby base -> hot rose middle -> blush tip, with fairly steep steps
+        let r = 150, g = 18, b = 58;
+        const zMid = sstep(0.2, 0.4, u);
+        r = lerp(r, 232, zMid); g = lerp(g, 52, zMid); b = lerp(b, 118, zMid);
+        const zTip = sstep(0.7, 0.92, u);
+        r = lerp(r, 255, zTip); g = lerp(g, 200, zTip); b = lerp(b, 224, zTip);
 
-        // 3. Petal body gradient along length u (rich ruby at base -> warm fuchsia -> glowing rose -> soft blush-white tips)
-        let pr: number, pg: number, pb: number;
-        if (u < 0.45) {
-          const t = u / 0.45;
-          pr = lerp(165, 235, t);
-          pg = lerp(22, 50, t);
-          pb = lerp(60, 118, t);
-        } else {
-          const t = (u - 0.45) / 0.55;
-          pr = lerp(235, 255, t);
-          pg = lerp(50, 218, t);
-          pb = lerp(118, 238, t);
-        }
+        // 2. Pale edge band so every petal has a readable outline against the one behind it
+        const edge = sstep(0.7, 0.92, av);
+        r = lerp(r, 255, edge * 0.8); g = lerp(g, 218, edge * 0.8); b = lerp(b, 234, edge * 0.8);
 
-        // Edge softening: slightly lighter towards lateral edges for natural petal translucency
-        const edgeLight = Math.pow(Math.abs(v), 2) * 0.25;
-        pr = lerp(pr, 255, edgeLight);
-        pg = lerp(pg, 210, edgeLight);
-        pb = lerp(pb, 235, edgeLight);
+        // 3. Longitudinal veins (5 thin lines) + a strong midrib
+        const veinFade = (1 - sstep(0.72, 0.96, u)) * (1 - edge);
+        const lines = Math.pow(Math.abs(Math.cos(v * Math.PI * 2.5)), 20);
+        const midrib = Math.exp(-Math.pow(v / 0.07, 2));
+        const vein = Math.min(1, lines * 0.8 + midrib * 0.9) * veinFade;
+        r = lerp(r, 190, vein * 0.85); g = lerp(g, 12, vein * 0.85); b = lerp(b, 82, vein * 0.85);
 
-        // Blend smoothly with lime-green throat (no abrupt cutoff!)
-        let r = lerp(pr, 115, throatGlow);
-        let g = lerp(pg, 215, throatGlow);
-        let b = lerp(pb, 28, throatGlow);
+        // 4. Lime-green throat with a short star ray along each petal
+        const throat = 1 - sstep(0.1, 0.24, u);
+        const ray = Math.exp(-Math.pow(v / 0.2, 2)) * (1 - sstep(0.18, 0.46, u));
+        const lime = Math.max(throat, ray * 0.7);
+        r = lerp(r, 150, lime); g = lerp(g, 226, lime); b = lerp(b, 40, lime);
 
-        // Blend soft magenta star midrib (smooth Gaussian blend without triangular edges)
-        const ribStrength = ribVein * 0.42 * (1 - throatGlow * 0.85);
-        r = lerp(r, 205, ribStrength);
-        g = lerp(g, 18, ribStrength);
-        b = lerp(b, 85, ribStrength);
+        // Ink (glyph weight): heavy characters on veins, lighter on edges and tips
+        let ink = lerp(0.8, 0.5, Math.pow(u, 1.2));
+        ink = lerp(ink, 0.42, edge);
+        ink = Math.max(ink, vein);
+        ink = lerp(ink, 0.9, lime * 0.6);
 
-        // Smooth continuous ink density
-        let ink = lerp(0.96, 0.75, Math.pow(u, 1.1)) + 0.12 * ribStrength;
-
-        // Organic freckles clustered in the lower cup (smooth radial probability)
-        const freckleProb = 0.08 * Math.exp(-Math.pow((u - 0.32) / 0.16, 2)) * Math.exp(-Math.pow(v / 0.5, 2));
+        // Dark freckles clustered in the lower cup, kept off the veins
+        const freckleProb =
+          0.1 *
+          Math.exp(-Math.pow((u - 0.34) / 0.16, 2)) *
+          Math.exp(-Math.pow(av / 0.5, 2)) *
+          (1 - vein);
         if (rnd() < freckleProb) {
           r = 135;
           g = 18;
@@ -268,7 +625,6 @@ function buildFlower(): Cloud {
       const rx = fx;
       const ry = fy * cosT - fz * sinT + flowerHeadY;
       const rz = fy * sinT + fz * cosT;
-      // Spring green at base to vivid golden filament
       push(rx, ry, rz, Math.round(lerp(120, 245, t)), Math.round(lerp(205, 158, t)), Math.round(lerp(25, 11, t)), 0.9);
     }
     // Pollen anthers at tips
@@ -282,12 +638,11 @@ function buildFlower(): Cloud {
       const rx = tipX + ox;
       const ry = (tipY + oy) * cosT - (tipZ + oz) * sinT + flowerHeadY;
       const rz = (tipY + oy) * sinT + (tipZ + oz) * cosT;
-      // Terracotta red-brown
       push(rx, ry, rz, 180, 60, 20, 1.0);
     }
   }
 
-  // Central Pistil / Stigma:
+  // Central Pistil / Stigma
   for (let i = 0; i <= 36; i++) {
     const t = i / 36;
     const py = 0.18 + 0.88 * t;
@@ -359,28 +714,64 @@ function buildFlower(): Cloud {
     g: new Uint8Array(n),
     b: new Uint8Array(n),
     ink: new Float32Array(n),
+    ord: new Float32Array(n),
+    jx: new Float32Array(n),
+    jy: new Float32Array(n),
+    jz: new Float32Array(n),
   };
+  let yMin = Infinity, yMax = -Infinity;
+  P.forEach((p) => {
+    if (p[1] < yMin) yMin = p[1];
+    if (p[1] > yMax) yMax = p[1];
+  });
+  const bootRnd = mulberry(7);
   P.forEach((p, i) => {
     c.x[i] = p[0]; c.y[i] = p[1]; c.z[i] = p[2];
     c.r[i] = p[3]; c.g[i] = p[4]; c.b[i] = p[5];
     c.ink[i] = p[6];
+    // Builds from the roots up (stem, leaves, then petals), with noise so it scatters in like a swarm
+    c.ord[i] = ((p[1] - yMin) / (yMax - yMin)) * 0.62 + bootRnd() * 0.38;
+    const theta = bootRnd() * Math.PI * 2;
+    const phi = Math.acos(2 * bootRnd() - 1);
+    const mag = 0.7 + bootRnd() * 1.4;
+    c.jx[i] = Math.sin(phi) * Math.cos(theta) * mag;
+    c.jy[i] = Math.sin(phi) * Math.sin(theta) * mag;
+    c.jz[i] = Math.cos(phi) * mag;
   });
   return c;
 }
 
 /* Character ramp with solid visible glyphs */
 const RAMP = ".:+*x7S8WoW%#@";
+/* Glyphs shown while a point is still assembling */
+const GLITCH = "01#@%&$<>/\\|+=";
+
+const hash32 = (n: number) => {
+  n = (n ^ 61) ^ (n >>> 16);
+  n = (n + (n << 3)) | 0;
+  n = n ^ (n >>> 4);
+  n = Math.imul(n, 0x27d4eb2d);
+  n = n ^ (n >>> 15);
+  return n >>> 0;
+};
 
 /* ------------------------------------------------------------------ */
-/*  Free-Floating Screen ASCII Flower (Open Bloom, Glow & Soft Depth) */
+/*  Free-Floating Screen ASCII Flower (boots in, then spins)           */
 /* ------------------------------------------------------------------ */
 
-const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | null> }> = ({
-  angleLabelRef,
-}) => {
+const AsciiFlower: React.FC<{
+  play: boolean;
+  angleLabelRef: React.RefObject<HTMLSpanElement | null>;
+  statusRef: React.RefObject<HTMLSpanElement | null>;
+}> = ({ play, angleLabelRef, statusRef }) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cloud = useMemo(buildFlower, []);
+  const playRef = useRef(play);
+
+  useEffect(() => {
+    playRef.current = play;
+  }, [play]);
 
   useEffect(() => {
     const wrap = wrapRef.current!;
@@ -391,6 +782,7 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
     let w = 0, h = 0, dpr = 1, cols = 0, rows = 0, CW = 8, CH = 10;
     let zbuf = new Float32Array(0);
     let pidx = new Int32Array(0);
+    let kbuf = new Float32Array(0);
 
     const resize = () => {
       const r = wrap.getBoundingClientRect();
@@ -406,6 +798,7 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
       rows = Math.ceil(h / CH);
       zbuf = new Float32Array(cols * rows);
       pidx = new Int32Array(cols * rows);
+      kbuf = new Float32Array(cols * rows);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -420,6 +813,14 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
     let raf = 0;
     let last = performance.now();
     let frameNo = 0;
+    let bootT0 = -1;
+
+    const setStatus = (text: string, online: boolean) => {
+      const el = statusRef.current;
+      if (!el) return;
+      if (el.textContent !== text) el.textContent = text;
+      el.style.color = online ? "#db2777" : "";
+    };
 
     const down = (e: PointerEvent) => {
       dragging = true;
@@ -469,6 +870,26 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      /* ---- Boot state: standby -> forming -> online ---- */
+      let form = 1;
+      if (!reduced) {
+        if (!playRef.current) {
+          ctx.clearRect(0, 0, w, h);
+          setStatus("STANDBY", false);
+          return;
+        }
+        if (bootT0 < 0) bootT0 = now;
+        const f = Math.min(1, (now - bootT0) / BOOT_MS);
+        form = f * f * (3 - 2 * f);
+        if (f < 1) setStatus(`FORMING ${String(Math.round(f * 100)).padStart(2, "0")}%`, false);
+        else setStatus("ONLINE", true);
+      } else {
+        setStatus("ONLINE", true);
+      }
+      const booting = form < 1;
+
       if (!dragging) {
         angle += (auto + vel) * dt;
         vel *= 0.94;
@@ -478,62 +899,97 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
       const isMobile = w < 640;
       const isTablet = w >= 640 && w < 1024;
 
-      // Responsive scale:
-      // - Mobile (<640px): compact bloom to fit comfortably in a 250px container
-      // - Tablet (640-1023px): modest scale so it never overpowers intermediate resized windows
-      // - Desktop (>=1024px): fine-tuned sweet-spot centerpiece (~6% smaller than previous, perfect balance)
+      // Responsive scale (unchanged: the size of the flower stays as you liked it)
       const scale = isMobile
         ? Math.min(h / 3.2, w / 2.1)
         : isTablet
           ? Math.min(h / 2.85, w / 1.95)
           : Math.min(h / 2.28, w / 1.56);
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       zbuf.fill(-1e9);
 
-      const { n, x, y, z } = cloud;
+      // Vertical anchor: moved lower so the bloom sits closer to the middle of the hero
+      const yOffset = isMobile ? -0.14 : isTablet ? -0.3 : -0.46;
+
+      const gtick = (now / 90) | 0;
+      const glitch = booting ? 1 - form : 0;
+
+      const { n, x, y, z, ord, jx, jy, jz } = cloud;
       for (let i = 0; i < n; i++) {
-        const x1 = x[i] * cs + z[i] * sn;
-        const z1 = -x[i] * sn + z[i] * cs;
-        const y2 = y[i] * ca - z1 * sa;
-        const z2 = z1 * ca + y[i] * sa;
+        let k = 1;
+        if (booting) {
+          k = Math.min(1, Math.max(0, (form * 1.45 - ord[i]) / 0.45));
+          if (k <= 0) continue;
+        }
+        const m = (1 - k) * (1 - k);
+        const px = x[i] + jx[i] * m;
+        const py = y[i] + jy[i] * m;
+        const pz = z[i] + jz[i] * m;
+
+        const x1 = px * cs + pz * sn;
+        const z1 = -px * sn + pz * cs;
+        const y2 = py * ca - z1 * sa;
+        const z2 = z1 * ca + py * sa;
         const s = 6 / (6 - z2);
-        const sx = w / 2 + x1 * scale * s;
-        // Calibrated vertical headroom anchor per breakpoint
-        const yOffset = isMobile ? -0.06 : isTablet ? -0.14 : -0.20;
+        let sx = w / 2 + x1 * scale * s;
         const sy = h / 2 - (y2 + yOffset) * scale * s;
+
+        // Glitch: whole horizontal bands slide sideways while the flower is forming
+        if (booting) {
+          const band = (sy / (CH * 5)) | 0;
+          const hv = hash32(band * 7919 + gtick * 104729);
+          if (hv % 100 < 5 + 14 * glitch) {
+            sx += (((hv >>> 8) % 21) - 10) * CW * (0.4 + glitch);
+          }
+        }
+
         const col = (sx / CW) | 0;
         const row = (sy / CH) | 0;
         if (col < 0 || row < 0 || col >= cols || row >= rows) continue;
         const idx = row * cols + col;
-        if (z2 > zbuf[idx]) { zbuf[idx] = z2; pidx[idx] = i; }
+        if (z2 > zbuf[idx]) { zbuf[idx] = z2; pidx[idx] = i; kbuf[idx] = k; }
       }
 
       ctx.font = `700 ${CH * 0.98}px ui-monospace, Menlo, Consolas, monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const tick = (now / 220) | 0;
+      const gt = (now / 60) | 0;
 
       for (let idx = 0; idx < zbuf.length; idx++) {
         const z2 = zbuf[idx];
         if (z2 < -1e8) continue;
         const i = pidx[idx];
+        const k = kbuf[idx];
         const d = Math.max(0, Math.min(1, (z2 + 1.4) / 2.8));
         const ink = cloud.ink[i] * (0.6 + 0.4 * d);
         let ci = Math.min(RAMP.length - 1, (ink * RAMP.length) | 0);
         if ((idx * 31 + tick * 17) % 13 === 0) ci = Math.max(0, ci - 1);
-        const a = 0.78 + 0.22 * d;
-        ctx.fillStyle = `rgba(${cloud.r[i]},${cloud.g[i]},${cloud.b[i]},${a.toFixed(2)})`;
-        // Soft glowing halo effect for realistic photographic bloom
-        ctx.shadowColor = `rgba(${cloud.r[i]},${cloud.g[i]},${cloud.b[i]},0.35)`;
-        ctx.shadowBlur = 3;
+
+        // Depth shading: back petals darker, front petals brighter, so overlapping petals stay distinct
+        const shade = 0.74 + 0.26 * d;
+        let rr = cloud.r[i] * shade;
+        let gg = cloud.g[i] * shade;
+        let bb = cloud.b[i] * shade;
+        let alpha = 0.8 + 0.2 * d;
+        let glyph = RAMP[ci];
+
+        if (k < 1) {
+          // Still assembling: hot-pink scrambled glyphs
+          const mix = (1 - k) * 0.75;
+          rr += (255 - rr) * mix;
+          gg += (70 - gg) * mix;
+          bb += (150 - bb) * mix;
+          alpha *= 0.55 + 0.45 * k;
+          glyph = GLITCH[(idx * 13 + gt * 7) % GLITCH.length];
+        }
+
+        ctx.fillStyle = `rgba(${rr | 0},${gg | 0},${bb | 0},${alpha.toFixed(2)})`;
         const col = idx % cols;
         const row = (idx / cols) | 0;
-        ctx.fillText(RAMP[ci], col * CW + CW / 2, row * CH + CH / 2);
+        ctx.fillText(glyph, col * CW + CW / 2, row * CH + CH / 2);
       }
-      // Reset shadow for next frame
-      ctx.shadowBlur = 0;
 
       if (angleLabelRef.current && ++frameNo % 6 === 0) {
         angleLabelRef.current.textContent = `${String(
@@ -552,7 +1008,7 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", up);
     };
-  }, [cloud, angleLabelRef]);
+  }, [cloud, angleLabelRef, statusRef]);
 
   return (
     <div ref={wrapRef} className="absolute inset-0">
@@ -571,11 +1027,44 @@ const AsciiFlower: React.FC<{ angleLabelRef: React.RefObject<HTMLSpanElement | n
 /* ------------------------------------------------------------------ */
 
 export const HeroStationery: React.FC<HeroStationeryProps> = ({
+  ready = true,
   onResumeClick,
   onScrollDown,
   onFolderClick,
 }) => {
+  const reduce = useReducedMotion();
+  const rootRef = useRef<HTMLElement>(null);
   const angleRef = useRef<HTMLSpanElement>(null);
+  const statusRef = useRef<HTMLSpanElement>(null);
+
+  /* Boot starts once the hero is on screen AND the loader (if any) is done */
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const play = ready && inView;
+
+  /* Blinking pink caret appears after the name has been built */
+  const [cursor, setCursor] = useState(false);
+  useEffect(() => {
+    if (!play) return;
+    const t = setTimeout(() => setCursor(true), reduce ? 0 : (T.name + 1.9) * 1000);
+    return () => clearTimeout(t);
+  }, [play, reduce]);
+
+  const role: string = PORTFOLIO_DATA.profile.tagline ?? "";
 
   const openFolder = (id: string) => {
     playUiClick(true);
@@ -584,7 +1073,7 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
   };
 
   return (
-    <section id="hero" className="relative overflow-hidden bg-[#f8f8fa]">
+    <section id="hero" ref={rootRef} className="relative overflow-hidden bg-[#f8f8fa]">
       <style>{`
         @keyframes hs-float {
           0%, 100% { transform: translateY(0); }
@@ -593,10 +1082,48 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
         .hs-float {
           animation: hs-float 6s ease-in-out infinite;
         }
+        @keyframes hs-cursor {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        .hs-cursor {
+          animation: hs-cursor 1s steps(1) infinite;
+        }
+
+        /* Hover: a letter turns into a blurred, grainy smear, then resolves back */
+        .hs-noisy-base { transition: opacity 0.8s ease; }
+        .hs-noisy-fx {
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.8s ease;
+        }
+        .hs-noisy-lg { filter: url(#hs-noisy-lg); }
+        .hs-noisy-sm { filter: url(#hs-noisy-sm); }
+        .hs-noisy:hover .hs-noisy-base { opacity: 0; transition-duration: 0.12s; }
+        .hs-noisy:hover .hs-noisy-fx { opacity: 1; transition-duration: 0.12s; }
+        .hs-noisy:hover + .hs-noisy .hs-noisy-fx { opacity: 0.45; transition-duration: 0.2s; }
+
         @media (prefers-reduced-motion: reduce) {
-          .hs-float { animation: none; }
+          .hs-float, .hs-cursor { animation: none; }
+          .hs-noisy-base, .hs-noisy-fx { transition: none; }
         }
       `}</style>
+
+      {/* SVG filters used by the hover effect (blur + noise displacement) */}
+      <svg aria-hidden width="0" height="0" style={{ position: "absolute" }}>
+        <defs>
+          <filter id="hs-noisy-lg" x="-50%" y="-50%" width="200%" height="200%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="noise" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+            <feDisplacementMap in="blur" in2="noise" scale="24" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+          <filter id="hs-noisy-sm" x="-50%" y="-50%" width="200%" height="200%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="noise" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
+            <feDisplacementMap in="blur" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
 
       {/* Faint ambient grid + soft blush glow behind the flower */}
       <div
@@ -604,7 +1131,7 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "radial-gradient(circle at 72% 44%, rgba(254,205,226,0.35), transparent 48%), radial-gradient(rgba(15,23,42,0.12) 1.2px, transparent 1.3px)",
+            "radial-gradient(circle at 72% 52%, rgba(254,205,226,0.26), transparent 46%), radial-gradient(rgba(15,23,42,0.12) 1.2px, transparent 1.3px)",
           backgroundSize: "100% 100%, 36px 36px",
           WebkitMaskImage: "linear-gradient(to bottom, #000 82%, transparent 100%)",
           maskImage: "linear-gradient(to bottom, #000 82%, transparent 100%)",
@@ -620,123 +1147,184 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
                 className="hs-float"
                 style={{ animationDelay: `${i * -1.1}s` }}
               >
-                <DraggableFolder
-                  label={f.label}
-                  rot={f.rot}
-                  onOpen={() => openFolder(f.id)}
-                />
+                <DropIn
+                  play={play}
+                  delay={T.folders + i * 0.16}
+                  color={CURSOR_COLOR}
+                  name={CURSOR_NAMES[i % CURSOR_NAMES.length]}
+                  from={[i % 2 ? 140 : -140, i % 3 ? -170 : 170]}
+                >
+                  <DraggableFolder
+                    label={f.label}
+                    rot={f.rot}
+                    onOpen={() => openFolder(f.id)}
+                  />
+                </DropIn>
               </div>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-1 items-center gap-6 sm:gap-8 lg:grid-cols-12 lg:gap-12">
-          {/* Left Column: Ultra-Readable Editorial Typography with Fade Gradient */}
-          <div className="relative z-10 space-y-4 sm:space-y-6 text-left lg:col-span-6 lg:pr-2">
-            <div className="space-y-3 sm:space-y-4">
-              {/* Refined Portfolio Eyebrow */}
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-pink-200/90 bg-white/85 px-3 py-0.5 sm:px-3.5 sm:py-1 text-[11px] sm:text-xs font-semibold tracking-wider text-pink-700 shadow-2xs backdrop-blur-md">
-                  <span className="h-1.5 w-1.5 rounded-full bg-pink-500 animate-pulse" />
-                  PORTFOLIO &middot; 2026
-                </span>
-              </div>
-
-              {/* Ultra-readable, sleek modern typography with delicate fade gradient */}
-              <h1 className="text-4xl sm:text-6xl lg:text-[5.25rem] font-black tracking-tight text-slate-900 leading-[0.96]">
-                <span className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 bg-clip-text text-transparent">
-                  Mica Danah
-                </span>
-                <br />
-                <span className="bg-gradient-to-r from-slate-950 via-slate-800 to-[#ec4899] bg-clip-text text-transparent">
-                  Paris
+          {/* Left Column: name > role > statement > location > actions */}
+          <div className="relative z-10 text-left lg:col-span-6 lg:pr-2">
+            {/* 1. Name: plain black bold sans */}
+            <BuildBlock
+              play={play}
+              delay={T.name}
+              color={CURSOR_COLOR}
+              name="Mica"
+              from={[-260, -120]}
+              to={[280, -150]}
+            >
+              <h1 className="text-[2.9rem] sm:text-7xl lg:text-[5.25rem] font-black leading-[0.95] tracking-[-0.045em] text-[#0a0a0a]">
+                <NoisyText text="Mica Danah" strength="lg" className="block whitespace-nowrap" />
+                <span className="block whitespace-nowrap">
+                  <NoisyText text="Paris" strength="lg" />
+                  {cursor && (
+                    <span
+                      aria-hidden
+                      className="hs-cursor ml-2 inline-block h-[0.72em] w-[0.1em] translate-y-[0.06em] rounded-[2px] bg-[#ec4899] align-baseline"
+                    />
+                  )}
                 </span>
               </h1>
+            </BuildBlock>
 
-              {/* Subtitle */}
-              <p className="text-[15px] sm:text-xl lg:text-2xl font-bold tracking-tight text-slate-800 pt-0.5 sm:pt-1">
-                Turning complex systems into delightful, intuitive experiences.
+            {/* 2. Role: one clean line, semibold, clearly second in the hierarchy */}
+            <BuildBlock
+              play={play}
+              delay={T.role}
+              color={CURSOR_COLOR}
+              name="Danah"
+              from={[-230, 120]}
+              to={[240, -70]}
+              className="mt-5 sm:mt-6"
+            >
+              <p className="max-w-xl text-xl sm:text-2xl lg:text-[1.6rem] font-semibold leading-tight tracking-tight text-slate-800">
+                <NoisyText text={role} strength="sm" accentAmp />
               </p>
+            </BuildBlock>
 
-              {/* Tagline */}
-              <p className="max-w-md text-xs sm:text-base leading-relaxed text-slate-600">
-                {PORTFOLIO_DATA.profile.tagline}
+            {/* 3. Statement: the only pixel-font text, small and quiet */}
+            <BuildBlock
+              play={play}
+              delay={T.statement}
+              color={CURSOR_COLOR}
+              name="Pixel"
+              from={[-210, 140]}
+              to={[250, 70]}
+              className="mt-4 sm:mt-5"
+            >
+              <DecodeText
+                text="Turning complex systems into delightful, intuitive experiences."
+                play={play}
+                delay={T.statement + 0.45}
+                color="#64748b"
+                className={`${pixel.className} block max-w-md text-[13px] sm:text-base lg:text-[1.05rem] font-medium leading-snug`}
+              />
+            </BuildBlock>
+
+            {/* 4. Location: quiet line */}
+            <SwarmBlock play={play} delay={T.location} className="mt-3">
+              <p className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500">
+                <MapPin className="h-3.5 w-3.5 text-pink-500" />
+                Based in the Philippines
               </p>
+            </SwarmBlock>
 
-              {/* Location Badge */}
-              <div className="pt-0.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-pink-200/80 bg-white/80 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-medium text-slate-700 shadow-2xs backdrop-blur-md">
-                  <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-pink-500" />
-                  Based in the Philippines
-                </span>
-              </div>
-            </div>
-
-            {/* macOS Aqua Jelly & Frosted Glass Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3.5 pt-1 sm:pt-2">
+            {/* 5. Actions: macOS Aqua jelly + frosted glass buttons */}
+            <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-2.5 sm:gap-3.5">
               {/* Pink Jelly Pill Button for Resume */}
-              <a
-                href={PORTFOLIO_DATA.profile.resumePath}
-                download="MicaDanahParis_Resume.pdf"
-                onClick={() => {
-                  playUiClick(true);
-                  onResumeClick?.();
-                }}
-                className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[#e0628f]/70 px-4 py-2.5 sm:px-7 sm:py-3 text-xs sm:text-[15px] font-semibold text-[#4a1230] transition hover:brightness-105 active:translate-y-px active:brightness-95 shadow-md"
-                style={{
-                  background:
-                    "linear-gradient(180deg, #ffc9db 0%, #ff9bbd 48%, #fb7fa9 52%, #ffa8c6 100%)",
-                  boxShadow:
-                    "inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 2px rgba(190,40,100,0.25), 0 8px 16px -6px rgba(244,114,182,0.6)",
-                  textShadow: "0 1px 0 rgba(255,255,255,0.55)",
-                }}
+              <BuildBlock
+                play={play}
+                delay={T.buttons}
+                color={CURSOR_COLOR}
+                name="Bot"
+                from={[-200, 160]}
+                to={[-120, 190]}
               >
-                {/* Specular highlight shine */}
-                <span className="pointer-events-none absolute inset-x-3 top-[3px] h-[44%] rounded-full bg-gradient-to-b from-white/80 to-white/10" />
-                <FileDown className="relative h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="relative">Download Resume</span>
-              </a>
+                <a
+                  href={PORTFOLIO_DATA.profile.resumePath}
+                  download="MicaDanahParis_Resume.pdf"
+                  onClick={() => {
+                    playUiClick(true);
+                    onResumeClick?.();
+                  }}
+                  className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[#e0628f]/70 px-4 py-2.5 sm:px-7 sm:py-3 text-xs sm:text-[15px] font-semibold text-[#4a1230] transition hover:brightness-105 active:translate-y-px active:brightness-95 shadow-md"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, #ffc9db 0%, #ff9bbd 48%, #fb7fa9 52%, #ffa8c6 100%)",
+                    boxShadow:
+                      "inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1px 2px rgba(190,40,100,0.25), 0 8px 16px -6px rgba(244,114,182,0.6)",
+                    textShadow: "0 1px 0 rgba(255,255,255,0.55)",
+                  }}
+                >
+                  {/* Specular highlight shine */}
+                  <span className="pointer-events-none absolute inset-x-3 top-[3px] h-[44%] rounded-full bg-gradient-to-b from-white/80 to-white/10" />
+                  <FileDown className="relative h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="relative">Download Resume</span>
+                </a>
+              </BuildBlock>
 
               {/* Frosted silver glass button for Read Story */}
               {onScrollDown && (
-                <button
-                  type="button"
-                  onClick={onScrollDown}
-                  className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-slate-300/80 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-[15px] font-medium text-slate-800 transition hover:bg-white active:translate-y-px active:brightness-95 shadow-xs"
-                  style={{
-                    background: "linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%)",
-                    boxShadow:
-                      "inset 0 1px 1px rgba(255,255,255,1), inset 0 -1px 2px rgba(15,23,42,0.08), 0 8px 16px -8px rgba(15,23,42,0.25)",
-                  }}
+                <BuildBlock
+                  play={play}
+                  delay={T.buttons + 0.25}
+                  color={CURSOR_COLOR}
+                  name="Danah"
+                  from={[220, 170]}
+                  to={[160, 200]}
                 >
-                  <span>See what I&apos;ve built</span>
-                  <ArrowDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-500" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={onScrollDown}
+                    className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-slate-300/80 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-[15px] font-medium text-slate-800 transition hover:bg-white active:translate-y-px active:brightness-95 shadow-xs"
+                    style={{
+                      background: "linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%)",
+                      boxShadow:
+                        "inset 0 1px 1px rgba(255,255,255,1), inset 0 -1px 2px rgba(15,23,42,0.08), 0 8px 16px -8px rgba(15,23,42,0.25)",
+                    }}
+                  >
+                    <span>See what I&apos;ve built</span>
+                    <ArrowDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-500" />
+                  </button>
+                </BuildBlock>
               )}
 
               {/* LinkedIn icon button */}
               {SOCIALS.map(({ label, href, Icon }) => (
-                <a
+                <BuildBlock
                   key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  onClick={() => playUiClick(true)}
-                  className="relative inline-flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-full border border-slate-300/80 text-slate-700 transition hover:bg-white hover:text-slate-950 active:translate-y-px shadow-xs"
-                  style={{
-                    background: "linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%)",
-                    boxShadow:
-                      "inset 0 1px 1px rgba(255,255,255,1), inset 0 -1px 2px rgba(15,23,42,0.08), 0 8px 16px -8px rgba(15,23,42,0.25)",
-                  }}
+                  play={play}
+                  delay={T.buttons + 0.5}
+                  color={CURSOR_COLOR}
+                  name="Paris"
+                  from={[120, 190]}
+                  to={[100, 210]}
                 >
-                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </a>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    onClick={() => playUiClick(true)}
+                    className="relative inline-flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-full border border-slate-300/80 text-slate-700 transition hover:bg-white hover:text-slate-950 active:translate-y-px shadow-xs"
+                    style={{
+                      background: "linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%)",
+                      boxShadow:
+                        "inset 0 1px 1px rgba(255,255,255,1), inset 0 -1px 2px rgba(15,23,42,0.08), 0 8px 16px -8px rgba(15,23,42,0.25)",
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </a>
+                </BuildBlock>
               ))}
             </div>
           </div>
 
-          {/* Right Column: Free-Floating 3D Star Lily (Open Bloom Chalice with Depth & Soft Glow) */}
+          {/* Right Column: Free-Floating 3D Star Lily (forms itself on boot) */}
           <div className="relative z-10 lg:col-span-6">
             <div
               className="relative h-[250px] sm:h-[380px] lg:h-[700px] w-full"
@@ -745,22 +1333,37 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
                 maskImage: "linear-gradient(to bottom, black 0%, black 80%, transparent 99%)",
               }}
             >
-              <AsciiFlower angleLabelRef={angleRef} />
+              <AsciiFlower play={play} angleLabelRef={angleRef} statusRef={statusRef} />
 
               {/* Floating editorial ASCII telemetry */}
-              <div className="pointer-events-none absolute left-3 top-2 sm:top-4 font-mono text-[9px] sm:text-[10px] leading-relaxed text-slate-400 select-none">
-                <p className="font-semibold tracking-wider text-slate-600">SUBJECT: STAR LILY</p>
-                <p className="hidden sm:block">CHARSET: 7 8 W S A</p>
-                <p>PETALS: 06 &middot; DENSITY: ULTRA</p>
-                <p className="hidden sm:block">MODE: PIXEL TO TEXT</p>
-              </div>
+              <SwarmBlock
+                play={play}
+                delay={T.hud}
+                className="pointer-events-none absolute left-3 top-2 sm:top-4"
+              >
+                <div className="font-mono text-[9px] sm:text-[10px] leading-relaxed text-slate-400 select-none">
+                  <p className="font-semibold tracking-wider text-slate-600">SUBJECT: STAR LILY</p>
+                  <p className="hidden sm:block">CHARSET: 7 8 W S A</p>
+                  <p>PETALS: 06 &middot; DENSITY: ULTRA</p>
+                  <p className="hidden sm:block">MODE: PIXEL TO TEXT</p>
+                  <p className="font-semibold tracking-wider">
+                    STATUS: <span ref={statusRef}>STANDBY</span>
+                  </p>
+                </div>
+              </SwarmBlock>
 
-              <div className="pointer-events-none absolute right-4 bottom-3 sm:bottom-12 text-right font-mono text-[9px] sm:text-[10px] leading-relaxed text-slate-400 select-none">
-                <p>
-                  ROT: <span ref={angleRef} className="font-semibold text-pink-600">034°</span>
-                </p>
-                <p className="tracking-wider">DRAG TO SPIN</p>
-              </div>
+              <SwarmBlock
+                play={play}
+                delay={T.hud + 0.6}
+                className="pointer-events-none absolute right-4 bottom-3 sm:bottom-12"
+              >
+                <div className="text-right font-mono text-[9px] sm:text-[10px] leading-relaxed text-slate-400 select-none">
+                  <p>
+                    ROT: <span ref={angleRef} className="font-semibold text-pink-600">034°</span>
+                  </p>
+                  <p className="tracking-wider">DRAG TO SPIN</p>
+                </div>
+              </SwarmBlock>
             </div>
           </div>
         </div>
@@ -768,14 +1371,23 @@ export const HeroStationery: React.FC<HeroStationeryProps> = ({
         {/* Pink Desktop Folders for Mobile / Tablet View (Compact Mini-Folders) */}
         <div className="relative z-10 mt-6 sm:mt-8 lg:hidden">
           <div className="flex items-center gap-3 overflow-x-auto px-2 py-2 no-scrollbar justify-start sm:justify-center">
-            {FOLDERS.map((f) => (
+            {FOLDERS.map((f, i) => (
               <div key={f.id} className="shrink-0">
-                <DraggableFolder
-                  label={f.label}
-                  rot={f.rot}
-                  size="sm"
-                  onOpen={() => openFolder(f.id)}
-                />
+                <DropIn
+                  play={play}
+                  delay={T.folders + i * 0.1}
+                  color={CURSOR_COLOR}
+                  name={CURSOR_NAMES[i % CURSOR_NAMES.length]}
+                  from={[0, 60]}
+                  showCursor={false}
+                >
+                  <DraggableFolder
+                    label={f.label}
+                    rot={f.rot}
+                    size="sm"
+                    onOpen={() => openFolder(f.id)}
+                  />
+                </DropIn>
               </div>
             ))}
           </div>
