@@ -257,9 +257,27 @@ function openContact(k: ContactKey) {
 }
 
 export function ContactNumpad() {
+  const sectionRef = useRef<HTMLElement>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [isInView, setIsInView] = useState(false);
   const hovered = CONTACT_KEYS.find((k) => k.id === hoverId);
+
+  // Stop 3D rendering pipeline completely when Contact section is off-screen
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.05, rootMargin: "120px 0px 120px 0px" }
+    );
+
+    io.observe(section);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     document.body.style.cursor = hoverId ? "pointer" : "auto";
@@ -267,7 +285,7 @@ export function ContactNumpad() {
   }, [hoverId]);
 
   return (
-    <section id="contact" className="relative scroll-mt-12 overflow-hidden bg-white py-16 sm:py-24">
+    <section ref={sectionRef} id="contact" className="relative scroll-mt-12 overflow-hidden bg-white py-16 sm:py-24">
       <style>{`
         .ct-pill {
           position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .45rem;
@@ -309,9 +327,10 @@ export function ContactNumpad() {
         {/* Floating 3D Numpad Stage (Compact & Floating) */}
         <div className="relative h-[460px] sm:h-[540px] lg:h-[580px] w-full" data-scene-ready={ready ? "" : undefined}>
           <Canvas
-            dpr={[1, 2]}
+            frameloop={isInView ? "always" : "never"}
+            dpr={[1, 1.5]}
             camera={{ position: [0, 5.4, 4.8], fov: 32 }}
-            gl={{ antialias: true, alpha: true }}
+            gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
             onCreated={({ camera }) => {
               camera.lookAt(0, 0, 0.15);
               requestAnimationFrame(() => setReady(true));

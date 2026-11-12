@@ -107,8 +107,11 @@ const AWARD_VIDEOS: AwardVideo[] = [
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 export const AchievementTheater: React.FC = () => {
+  const sectionRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isInView, setIsInView] = useState(false);
   const [mutedStates, setMutedStates] = useState<Record<string, boolean>>({
     "senas-promo": true,
     "advocacy-video": true,
@@ -123,6 +126,34 @@ export const AchievementTheater: React.FC = () => {
     playUiClick(true);
     setMutedStates((prev) => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // Strictly pause all videos when Achievement section is scrolled off-screen to save battery & thermal power
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        const inView = entry.isIntersecting;
+        setIsInView(inView);
+        if (!inView) {
+          // Immediately pause all videos when offscreen
+          Object.values(videoRefs.current).forEach((v) => {
+            if (v && !v.paused) v.pause();
+          });
+        } else {
+          // Resume muted playback only when in view
+          Object.values(videoRefs.current).forEach((v) => {
+            if (v && v.paused) v.play().catch(() => {});
+          });
+        }
+      },
+      { threshold: 0.08 }
+    );
+
+    io.observe(section);
+    return () => io.disconnect();
+  }, []);
 
   // Parallax Scroll Effect on Floating Elements
   useEffect(() => {
@@ -163,6 +194,7 @@ export const AchievementTheater: React.FC = () => {
   return (
     <section
       id="achievements"
+      ref={sectionRef}
       className="relative scroll-mt-12 overflow-hidden bg-[#f8f8fa] pt-4 pb-8 sm:pt-6 sm:pb-10"
     >
       <style>{`
@@ -290,8 +322,11 @@ export const AchievementTheater: React.FC = () => {
                   {/* Video Canvas (16:10 Landscape) */}
                   <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden group">
                     <video
+                      ref={(el) => {
+                        videoRefs.current[v.id] = el;
+                      }}
                       src={v.videoUrl}
-                      autoPlay
+                      preload="metadata"
                       loop
                       muted={mutedStates[v.id]}
                       playsInline

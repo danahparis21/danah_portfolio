@@ -79,6 +79,7 @@ export const ProjectsScrollStory: React.FC = () => {
   const userPaused = useRef(false);
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(true);
+  const [isInView, setIsInView] = useState(false);
 
   const currentProject = projects[activeIdx] ?? projects[0];
   const hasPhone = currentProject.id in MOBILE_DEMOS;
@@ -93,9 +94,11 @@ export const ProjectsScrollStory: React.FC = () => {
 
     const io = new IntersectionObserver(
       ([entry]) => {
+        const inView = entry.isIntersecting;
+        setIsInView(inView);
         const v = videoRef.current;
         const p = phoneRef.current;
-        if (!entry.isIntersecting) {
+        if (!inView) {
           if (v && !v.paused) v.pause();
           if (p && !p.paused) p.pause();
         } else {
@@ -103,17 +106,18 @@ export const ProjectsScrollStory: React.FC = () => {
           if (p && p.paused && !userPaused.current) p.play().catch(() => {});
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.08 }
     );
 
     io.observe(section);
     return () => io.disconnect();
   }, []);
 
-  // Reset video playback states on project switch
+  // Reset video playback states on project switch (only play if section is in view)
   useEffect(() => {
     userPaused.current = false;
     setPlaying(true);
+    if (!isInView) return;
     const web = videoRef.current;
     if (web) {
       web.currentTime = 0;
@@ -124,7 +128,7 @@ export const ProjectsScrollStory: React.FC = () => {
       phone.currentTime = 0;
       phone.play().catch(() => {});
     }
-  }, [activeIdx]);
+  }, [activeIdx, isInView]);
 
   // Listen for open-project-tab event from navigation or hero folders
   useEffect(() => {
@@ -630,7 +634,7 @@ export const ProjectsScrollStory: React.FC = () => {
                                 <video
                                   ref={videoRef}
                                   src={currentProject.videoUrl}
-                                  autoPlay
+                                  preload="metadata"
                                   loop
                                   muted
                                   playsInline
@@ -684,7 +688,7 @@ export const ProjectsScrollStory: React.FC = () => {
                                 <video
                                   ref={phoneRef}
                                   src={phoneSrc}
-                                  autoPlay
+                                  preload="metadata"
                                   loop
                                   muted
                                   playsInline

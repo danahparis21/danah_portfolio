@@ -510,7 +510,7 @@ const sstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-function buildFlower(): Cloud {
+function buildFlower(isMobile = false): Cloud {
   const rnd = mulberry(42);
   const P: number[][] = [];
   const push = (
@@ -535,9 +535,9 @@ function buildFlower(): Cloud {
     const ct = Math.cos(baseAngle);
     const st = Math.sin(baseAngle);
 
-    // Dense regular 2D grid (110 length steps x 64 width steps = 7,040 points per petal)
-    const U_STEPS = 110;
-    const V_STEPS = 64;
+    // Optimized grid: on mobile, 52 length steps x 30 width steps = 1,560 points per petal (instead of 7,040)
+    const U_STEPS = isMobile ? 52 : 110;
+    const V_STEPS = isMobile ? 30 : 64;
     for (let iu = 0; iu < U_STEPS; iu++) {
       const u = (iu + 0.5) / U_STEPS;
       for (let iv = 0; iv < V_STEPS; iv++) {
@@ -613,11 +613,13 @@ function buildFlower(): Cloud {
   }
 
   /* Stamens: 6 prominent filaments rising from the center with large pollen anthers */
+  const filamentSteps = isMobile ? 20 : 40;
+  const antherSteps = isMobile ? 18 : 40;
   for (let k = 0; k < 6; k++) {
     const a = (k * Math.PI * 2) / 6 + 0.28;
     const filamentLen = 0.75;
-    for (let i = 0; i <= 40; i++) {
-      const t = i / 40;
+    for (let i = 0; i <= filamentSteps; i++) {
+      const t = i / filamentSteps;
       const frho = filamentLen * Math.pow(t, 0.85);
       const fx = frho * Math.cos(a);
       const fz = frho * Math.sin(a);
@@ -631,7 +633,7 @@ function buildFlower(): Cloud {
     const tipX = filamentLen * Math.cos(a);
     const tipZ = filamentLen * Math.sin(a);
     const tipY = 0.12 + 0.75 - 0.22;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < antherSteps; i++) {
       const ox = (rnd() - 0.5) * 0.14;
       const oy = (rnd() - 0.5) * 0.08;
       const oz = (rnd() - 0.5) * 0.14;
@@ -643,8 +645,9 @@ function buildFlower(): Cloud {
   }
 
   // Central Pistil / Stigma
-  for (let i = 0; i <= 36; i++) {
-    const t = i / 36;
+  const pistilSteps = isMobile ? 18 : 36;
+  for (let i = 0; i <= pistilSteps; i++) {
+    const t = i / pistilSteps;
     const py = 0.18 + 0.88 * t;
     const px = 0.08 * t * Math.sin(t * 2);
     const pz = 0.08 * t * Math.cos(t * 2);
@@ -656,7 +659,8 @@ function buildFlower(): Cloud {
 
   /* Stem: rich emerald botanical stalk */
   const stemX = (y: number) => 0.14 * Math.sin(-y * 0.9);
-  for (let i = 0; i < 2600; i++) {
+  const stemSamples = isMobile ? 1000 : 2600;
+  for (let i = 0; i < stemSamples; i++) {
     const s = rnd();
     const y = -3.2 * s;
     const a = rnd() * Math.PI * 2;
@@ -677,8 +681,8 @@ function buildFlower(): Cloud {
     const bx = stemX(yAttach);
     const dx = Math.cos(phi);
     const dz = Math.sin(phi);
-    const LU = 70;
-    const LV = 36;
+    const LU = isMobile ? 36 : 70;
+    const LV = isMobile ? 18 : 36;
     for (let iu = 0; iu < LU; iu++) {
       const u = (iu + 0.5) / LU;
       for (let iv = 0; iv < LV; iv++) {
@@ -766,7 +770,15 @@ const AsciiFlower: React.FC<{
 }> = ({ play, angleLabelRef, statusRef }) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const cloud = useMemo(buildFlower, []);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsMobile(window.innerWidth < 768 || /Mobi|Android|iPhone/i.test(navigator.userAgent));
+    }
+  }, []);
+
+  const cloud = useMemo(() => buildFlower(isMobile), [isMobile]);
   const playRef = useRef(play);
 
   useEffect(() => {
@@ -787,7 +799,7 @@ const AsciiFlower: React.FC<{
     const resize = () => {
       const r = wrap.getBoundingClientRect();
       w = r.width; h = r.height;
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       canvas.style.width = `${w}px`;
